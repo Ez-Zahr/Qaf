@@ -12,10 +12,20 @@ wchar_t* wcsrev(wchar_t* str) {
     return str;
 }
 
-void init_src(src_t* src) {
+int isaralpha(wchar_t c) {
+    return (0x600 <= c && c <= 0x6ff);
+}
+
+int isop(wchar_t c) {
+    return (c == L'=' || c == L'+' || c == L'-' || c == L'*' || c == L'/');
+}
+
+void init_src(src_t* src, char* filename) {
+    src->filename = filename;
     src->cap = 512;
     src->size = 0;
     src->pos = 0;
+    
     src->buf = (wchar_t*) calloc(src->cap, sizeof(wchar_t));
     if (src->buf == NULL) {
         printf("Failed to initialize source buffer\n");
