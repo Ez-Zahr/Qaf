@@ -22,7 +22,7 @@ int isop(wchar_t c) {
 
 void init_src(src_t* src, char* filename) {
     src->filename = filename;
-    src->cap = 512;
+    src->cap = 1024;
     src->size = 0;
     src->pos = 0;
     

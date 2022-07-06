@@ -1,7 +1,7 @@
 #include "../include/lexer.h"
 
 void init_lexer(lexer_t* lexer) {
-    lexer->cap = 256;
+    lexer->cap = 64;
     lexer->size = 0;
     lexer->pos = 0;
     
@@ -13,25 +13,31 @@ void init_lexer(lexer_t* lexer) {
 
     int i;
     for (i = 0; i < lexer->cap; i++) {
-        lexer->tokens[i].len = 0;
-        lexer->tokens[i].data = (wchar_t*) calloc(1, sizeof(wchar_t));
+        lexer->tokens[i].len = 1;
+        lexer->tokens[i].data = (wchar_t*) calloc(lexer->tokens[i].len, sizeof(wchar_t));
+        if (lexer->tokens[i].data == NULL) {
+            printf("Failed to initialize token's data\n");
+            exit(1);
+        }
     }
 }
 
 void add_tok(lexer_t* lexer, src_t* src, tok_type_t type) {
-    token_t tok = lexer->tokens[lexer->size++];
-    tok.type = type;
-
+    token_t* tok = &lexer->tokens[lexer->size++];
+    tok->type = type;
+    
     do {
-        tok.data[tok.len++] = src->buf[src->pos++];
-        tok.data = (wchar_t*) realloc(tok.data, (tok.len + 1) * sizeof(wchar_t));
-        if (tok.data == NULL) {
+        tok->data[tok->len-1] = src->buf[src->pos++];
+        tok->len++;
+        
+        tok->data = (wchar_t*) realloc(tok->data, tok->len * sizeof(wchar_t));
+        if (tok->data == NULL) {
             printf("Failed to resize data\n");
             exit(1);
         }
-    } while (!isspace(src->buf[src->pos]) || src->buf[src->pos] != L'\0');
+    } while (!isspace(src->buf[src->pos]) && src->buf[src->pos] != L'\0');
     
-    tok.data[tok.len] = L'\0';
+    tok->data[tok->len] = L'\0';
     
     if (lexer->size >= lexer->cap) {
         lexer->cap *= 2;
