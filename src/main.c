@@ -1,5 +1,6 @@
 #include "../include/util.h"
 #include "../include/lexer.h"
+#include "../include/parser.h"
 
 int main(int argc, char* argv[]) {
     if (setlocale(LC_ALL, "ar_SA.utf8") == NULL) {
@@ -20,6 +21,10 @@ int main(int argc, char* argv[]) {
     init_lexer(&lexer);
     lex(&src, &lexer);
 
+    parser_t parser;
+    init_parser(&parser);
+    parse(&lexer, &parser);
+    
     free(src.buf);
     free_lexer(&lexer);
     return 0;
