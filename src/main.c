@@ -1,6 +1,7 @@
 #include "../include/util.h"
 #include "../include/lexer.h"
 #include "../include/parser.h"
+#include "../include/evaluator.h"
 
 int main(int argc, char* argv[]) {
     if (setlocale(LC_ALL, "ar_SA.utf8") == NULL) {
@@ -21,22 +22,15 @@ int main(int argc, char* argv[]) {
     init_lexer(&lexer);
     lex(&src, &lexer);
 
-    // int i;
-    // for (i = 0; i < lexer.size; i++) {
-    //     wprintf(L"%ls\n", lexer.tokens[i].data);
-    // }
-
-    vars_t vars;
-    init_vars(&vars);
-
     parser_t parser;
     init_parser(&parser);
-    parse(&lexer, &parser, &vars);
+    parse(&lexer, &parser);
+    
     print_tree(parser.parseTree, 0);
+    eval(&parser);
     
     free_src(&src);
     free_lexer(&lexer);
-    free_vars(&vars);
     free_parser(&parser);
     return 0;
 }
