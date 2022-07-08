@@ -57,3 +57,7 @@ void read_src(char* filename, src_t* src) {
     
     fclose(input);
 }
+
+void free_src(src_t* src) {
+    free(src->buf);
+}

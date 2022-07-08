@@ -22,6 +22,14 @@ void init_lexer(lexer_t* lexer) {
     }
 }
 
+token_t* peek(lexer_t* lexer, int offset) {
+    if (lexer->pos + offset >= lexer->size) {
+        return NULL;
+    }
+
+    return &lexer->tokens[lexer->pos + offset];
+}
+
 void add_tok(lexer_t* lexer, src_t* src, tok_type_t type) {
     token_t* tok = &lexer->tokens[lexer->size++];
     tok->type = type;

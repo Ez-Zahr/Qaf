@@ -23,6 +23,7 @@ typedef struct {
 } lexer_t;
 
 void init_lexer(lexer_t* lexer);
+token_t* peek(lexer_t* lexer, int offset);
 void add_tok(lexer_t* lexer, src_t* src, tok_type_t type);
 void lex(src_t* src, lexer_t* lexer);
 void free_lexer(lexer_t* lexer);
