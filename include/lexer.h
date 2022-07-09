@@ -5,14 +5,21 @@
 
 typedef enum {
     TOK_ID,
+
     TOK_NUM,
-    TOK_OP
+    
+    TOK_ASSIGN,
+    TOK_PLUS,
+    TOK_MINUS,
+    TOK_MUL,
+    TOK_DIV
 } tok_type_t;
 
 typedef struct {
     wchar_t* data;
-    tok_type_t type;
     int len;
+    tok_type_t type;
+    int val;
 } token_t;
 
 typedef struct {
@@ -24,7 +31,6 @@ typedef struct {
 
 void init_lexer(lexer_t* lexer);
 token_t* peek(lexer_t* lexer, int offset);
-void add_tok(lexer_t* lexer, src_t* src, tok_type_t type);
 void lex(src_t* src, lexer_t* lexer);
 void free_lexer(lexer_t* lexer);
 

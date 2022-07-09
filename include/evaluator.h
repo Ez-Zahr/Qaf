@@ -14,6 +14,6 @@ typedef struct {
     wchar_t* str_val;
 } obj_t;
 
-obj_t* eval(parser_t* parser);
+void eval(parser_t* parser);
 
 #endif

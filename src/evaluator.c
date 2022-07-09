@@ -1,108 +1,90 @@
 #include "../include/evaluator.h"
 
-void _eval(node_t* node, vars_t* vars, obj_t* ret) {
+node_t* _eval(node_t* node, vars_t* vars) {
     if (node == NULL) {
-        return;
+        return NULL;
     }
 
     switch (node->tok->type) {
-        case TOK_ID:
-            ret->str_val = node->tok->data;
-            ret->type = OBJ_STR;
-            break;
+        case TOK_ID: {
+            return node;
+        }
         
         case TOK_NUM: {
             char buf[32];
             wcstombs(buf, node->tok->data, 32);
-            ret->int_val = atoi(buf);
-            ret->type = OBJ_INT;
-            break;
+            node->tok->val = atoi(buf);
+            return node;
         }
 
-        case TOK_OP: {
-            if (node->left == NULL || node->right == NULL) {
-                printf("Missing operand for operator `%ls`\n", node->tok->data);
+        case TOK_ASSIGN: {
+            node_t* left = _eval(node->left, vars);
+            node_t* right = _eval(node->right, vars);
+            if (left == NULL || right == NULL || left->tok->type != TOK_ID || right->tok->type != TOK_NUM) {
+                printf("Error: Invalid operand to `+` operator\n");
                 exit(1);
             }
-
-            if (wcscmp(node->tok->data, L"=") == 0) {
-                _eval(node->left, vars, ret);
-                if (ret->type != OBJ_STR) {
-                    printf("Error: expecting a variable for assignment\n");
-                    exit(1);
-                }
-                wchar_t* id = ret->str_val;
-                _eval(node->right, vars, ret);
-            } else if (wcscmp(node->tok->data, L"+") == 0) {
-                _eval(node->left, vars, ret);
-                if (ret->type != OBJ_INT) {
-                    printf("Error: invalid operand for operator `%ls`\n", node->tok->data);
-                    exit(1);
-                }
-                int left = ret->int_val;
-                _eval(node->right, vars, ret);
-                if (ret->type != OBJ_INT) {
-                    printf("Error: invalid operand for operator `%ls`\n", node->tok->data);
-                    exit(1);
-                }
-                int right = ret->int_val;
-                ret->int_val = left + right;
-            } else if (wcscmp(node->tok->data, L"-") == 0) {
-                _eval(node->left, vars, ret);
-                if (ret->type != OBJ_INT) {
-                    printf("Error: invalid operand for operator `%ls`\n", node->tok->data);
-                    exit(1);
-                }
-                int left = ret->int_val;
-                _eval(node->right, vars, ret);
-                if (ret->type != OBJ_INT) {
-                    printf("Error: invalid operand for operator `%ls`\n", node->tok->data);
-                    exit(1);
-                }
-                int right = ret->int_val;
-                ret->int_val = left - right;
-            } else if (wcscmp(node->tok->data, L"*") == 0) {
-                _eval(node->left, vars, ret);
-                if (ret->type != OBJ_INT) {
-                    printf("Error: invalid operand for operator `%ls`\n", node->tok->data);
-                    exit(1);
-                }
-                int left = ret->int_val;
-                _eval(node->right, vars, ret);
-                if (ret->type != OBJ_INT) {
-                    printf("Error: invalid operand for operator `%ls`\n", node->tok->data);
-                    exit(1);
-                }
-                int right = ret->int_val;
-                ret->int_val = left * right;
-            } else if (wcscmp(node->tok->data, L"/") == 0) {
-                _eval(node->left, vars, ret);
-                if (ret->type != OBJ_INT) {
-                    printf("Error: invalid operand for operator `%ls`\n", node->tok->data);
-                    exit(1);
-                }
-                int left = ret->int_val;
-                _eval(node->right, vars, ret);
-                if (ret->type != OBJ_INT) {
-                    printf("Error: invalid operand for operator `%ls`\n", node->tok->data);
-                    exit(1);
-                }
-                int right = ret->int_val;
-                ret->int_val = left / right;
+            if (is_var(vars, left->tok->data)) {
+                update_var(vars, left->tok->data, right->tok);
             } else {
-
+                add_var(vars, left->tok->data, right->tok);
             }
-            break;
+            return right;
+        }
+
+        case TOK_PLUS: {
+            node_t* left = _eval(node->left, vars);
+            node_t* right = _eval(node->right, vars);
+            if (left == NULL || right == NULL || left->tok->type != TOK_NUM || right->tok->type != TOK_NUM) {
+                printf("Error: Invalid operand to `+` operator\n");
+                exit(1);
+            }
+            node->tok->val = left->tok->val + right->tok->val;
+            node->tok->type = TOK_NUM;
+            return node;
+        }
+
+        case TOK_MINUS: {
+            node_t* left = _eval(node->left, vars);
+            node_t* right = _eval(node->right, vars);
+            if (left == NULL || right == NULL || left->tok->type != TOK_NUM || right->tok->type != TOK_NUM) {
+                printf("Error: Invalid operand to `-` operator\n");
+                exit(1);
+            }
+            node->tok->val = left->tok->val - right->tok->val;
+            node->tok->type = TOK_NUM;
+            return node;
+        }
+
+        case TOK_MUL: {
+            node_t* left = _eval(node->left, vars);
+            node_t* right = _eval(node->right, vars);
+            if (left == NULL || right == NULL || left->tok->type != TOK_NUM || right->tok->type != TOK_NUM) {
+                printf("Error: Invalid operand to `*` operator\n");
+                exit(1);
+            }
+            node->tok->val = left->tok->val * right->tok->val;
+            node->tok->type = TOK_NUM;
+            return node;
+        }
+
+        case TOK_DIV: {
+            node_t* left = _eval(node->left, vars);
+            node_t* right = _eval(node->right, vars);
+            if (left == NULL || right == NULL || left->tok->type != TOK_NUM || right->tok->type != TOK_NUM) {
+                printf("Error: Invalid operand to `/` operator\n");
+                exit(1);
+            }
+            node->tok->val = left->tok->val / right->tok->val;
+            node->tok->type = TOK_NUM;
+            return node;
         }
 
         default:
-            break;
+            return NULL;
     }
 }
 
-obj_t* eval(parser_t* parser) {
-    obj_t ret;
-    _eval(parser->parseTree, parser->vars, &ret);
-    printf("%d\n", ret.int_val);
-    return NULL;
+void eval(parser_t* parser) {
+    _eval(parser->parseTree, parser->vars);
 }

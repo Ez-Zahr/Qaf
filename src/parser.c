@@ -81,41 +81,17 @@ void init_parser(parser_t* parser) {
 }
 
 node_t* parse_primary_expr(lexer_t* lexer, vars_t* vars) {
-    node_t* prim_node;
-
     switch (lexer->tokens[lexer->pos].type) {
         case TOK_NUM: {
-            prim_node = (node_t*) calloc(1, sizeof(node_t));
+            node_t* prim_node = (node_t*) calloc(1, sizeof(node_t));
             prim_node->tok = &lexer->tokens[lexer->pos++];
             return prim_node;
         }
         
         case TOK_ID: {
-            token_t* next = peek(lexer, 1);
-            if (next != NULL) {
-                if (wcscmp(next->data, L"=") == 0) {
-                    prim_node = (node_t*) calloc(1, sizeof(node_t));
-                    prim_node->tok = &lexer->tokens[lexer->pos++];
-                    return prim_node;
-                } else if (is_var(vars, lexer->tokens[lexer->pos].data)) {
-                    prim_node = (node_t*) calloc(1, sizeof(node_t));
-                    prim_node->tok = get_var_val(vars, lexer->tokens[lexer->pos++].data);
-                    return prim_node;
-                } else {
-                    wprintf(L"Undefined variable `%ls`\n", lexer->tokens[lexer->pos].data);
-                    exit(1);
-                }
-            } else {
-                if (is_var(vars, lexer->tokens[lexer->pos].data)) {
-                    prim_node = (node_t*) calloc(1, sizeof(node_t));
-                    prim_node->tok = get_var_val(vars, lexer->tokens[lexer->pos++].data);
-                    return prim_node;
-                } else {
-                    wprintf(L"Undefined variable `%ls`\n", lexer->tokens[lexer->pos].data);
-                    exit(1);
-                }
-            }
-            break;
+            node_t* prim_node = (node_t*) calloc(1, sizeof(node_t));
+            prim_node->tok = &lexer->tokens[lexer->pos++];
+            return prim_node;
         }
 
         default:
@@ -127,7 +103,7 @@ node_t* parse_primary_expr(lexer_t* lexer, vars_t* vars) {
 node_t* parse_factor(lexer_t* lexer, vars_t* vars) {
     node_t* left = parse_primary_expr(lexer, vars);
     
-    while (wcscmp(lexer->tokens[lexer->pos].data, L"*") == 0 || wcscmp(lexer->tokens[lexer->pos].data, L"/") == 0) {
+    while (lexer->tokens[lexer->pos].type == TOK_MUL || lexer->tokens[lexer->pos].type == TOK_DIV) {
         node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
         op_node->tok = &lexer->tokens[lexer->pos++];
         node_t* right = parse_primary_expr(lexer, vars);
@@ -142,7 +118,7 @@ node_t* parse_factor(lexer_t* lexer, vars_t* vars) {
 node_t* parse_term(lexer_t* lexer, vars_t* vars) {
     node_t* left = parse_factor(lexer, vars);
     
-    while (wcscmp(lexer->tokens[lexer->pos].data, L"+") == 0 || wcscmp(lexer->tokens[lexer->pos].data, L"-") == 0) {
+    while (lexer->tokens[lexer->pos].type == TOK_PLUS || lexer->tokens[lexer->pos].type == TOK_MINUS) {
         node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
         op_node->tok = &lexer->tokens[lexer->pos++];
         node_t* right = parse_factor(lexer, vars);
@@ -155,13 +131,18 @@ node_t* parse_term(lexer_t* lexer, vars_t* vars) {
 }
 
 void parse(lexer_t* lexer, parser_t* parser) {
-    parser->parseTree = (node_t*) calloc(1, sizeof(node_t));
-    parser->parseTree->left = parse_term(lexer, parser->vars);
+    node_t* left = parse_term(lexer, parser->vars);
     
-    if (wcscmp(lexer->tokens[lexer->pos].data, L"=") == 0) {
-        parser->parseTree->tok = &lexer->tokens[lexer->pos++];
-        parser->parseTree->right = parse_term(lexer, parser->vars);
+    if (lexer->tokens[lexer->pos].type == TOK_ASSIGN) {
+        node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
+        op_node->tok = &lexer->tokens[lexer->pos++];
+        node_t* right = parse_term(lexer, parser->vars);
+        op_node->left = left;
+        op_node->right = right;
+        left = op_node;
     }
+
+    parser->parseTree = left;
 }
 
 void free_parse_tree(node_t* node) {

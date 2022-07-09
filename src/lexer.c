@@ -57,6 +57,29 @@ void add_tok(lexer_t* lexer, src_t* src, tok_type_t type) {
     }
 }
 
+tok_type_t get_op_type(wchar_t op) {
+    switch (op)
+    {
+    case L'=':
+        return TOK_ASSIGN;
+        break;
+    case L'+':
+        return TOK_PLUS;
+        break;
+    case L'-':
+        return TOK_MINUS;
+        break;
+    case L'*':
+        return TOK_MUL;
+        break;
+    case L'/':
+        return TOK_DIV;
+        break;
+    default:
+        break;
+    }
+}
+
 void lex(src_t* src, lexer_t* lexer) {
     while (src->pos < src->size) {
         if (isaralpha(src->buf[src->pos])) {
@@ -64,7 +87,7 @@ void lex(src_t* src, lexer_t* lexer) {
         } else if (isdigit(src->buf[src->pos])) {
             add_tok(lexer, src, TOK_NUM);
         } else if (isop(src->buf[src->pos])) {
-            add_tok(lexer, src, TOK_OP);
+            add_tok(lexer, src, get_op_type(src->buf[src->pos]));
         }
 
         src->pos++;

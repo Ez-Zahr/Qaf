@@ -22,11 +22,21 @@ int main(int argc, char* argv[]) {
     init_lexer(&lexer);
     lex(&src, &lexer);
 
+    if (0) {
+        int i;
+        for (i = 0; i < lexer.size; i++) {
+            wprintf(L"`%ls` of length %d type %d\n", lexer.tokens[i].data, lexer.tokens[i].len, lexer.tokens[i].type);
+        }
+    }
+
     parser_t parser;
     init_parser(&parser);
     parse(&lexer, &parser);
+
+    if (0) {
+        print_tree(parser.parseTree, 0);
+    }
     
-    print_tree(parser.parseTree, 0);
     eval(&parser);
     
     free_src(&src);
