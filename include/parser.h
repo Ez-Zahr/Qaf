@@ -34,6 +34,7 @@ token_t* get_var_val(vars_t* vars, wchar_t* id);
 
 void init_parser(parser_t* parser);
 void parse(lexer_t* lexer, parser_t* parser);
+void free_parse_tree(node_t* node);
 void free_parser(parser_t* parser);
 
 #endif

@@ -5,6 +5,7 @@
 
 typedef enum {
     TOK_ID,
+    TOK_KEYWORD,
 
     TOK_NUM,
     
@@ -12,7 +13,10 @@ typedef enum {
     TOK_PLUS,
     TOK_MINUS,
     TOK_MUL,
-    TOK_DIV
+    TOK_DIV,
+
+    TOK_NEWLINE,
+    TOK_EOF
 } tok_type_t;
 
 typedef struct {

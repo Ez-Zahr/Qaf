@@ -28,7 +28,7 @@ void init_src(src_t* src, char* filename) {
     
     src->buf = (wchar_t*) calloc(src->cap, sizeof(wchar_t));
     if (src->buf == NULL) {
-        printf("Failed to initialize source buffer\n");
+        wprintf(L"Failed to initialize source buffer\n");
         exit(1);
     }
 }
@@ -37,7 +37,7 @@ void read_src(char* filename, src_t* src) {
     FILE* input;
 
     if ((input = fopen(filename, "r")) == NULL) {
-        printf("Could not open file %s\n", filename);
+        wprintf(L"Could not open file %s\n", filename);
         exit(1);
     }
 
@@ -47,7 +47,7 @@ void read_src(char* filename, src_t* src) {
             src->cap *= 2;
             src->buf = (wchar_t*) realloc(src->buf, src->cap * sizeof(wchar_t));
             if (src->buf == NULL) {
-                printf("Failed to resize source buffer\n");
+                wprintf(L"Failed to resize source buffer\n");
                 exit(1);
             }
         }
