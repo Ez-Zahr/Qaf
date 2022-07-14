@@ -13,21 +13,13 @@ void init_lexer(lexer_t* lexer) {
 
     int i;
     for (i = 0; i < lexer->cap; i++) {
-        lexer->tokens[i].len = 1;
-        lexer->tokens[i].data = (wchar_t*) calloc(lexer->tokens[i].len, sizeof(wchar_t));
+        lexer->tokens[i].len = 0;
+        lexer->tokens[i].data = (wchar_t*) calloc(1, sizeof(wchar_t));
         if (lexer->tokens[i].data == NULL) {
             wprintf(L"Failed to initialize token's data\n");
             exit(1);
         }
     }
-}
-
-token_t* peek(lexer_t* lexer, int offset) {
-    if (lexer->pos + offset >= lexer->size) {
-        return NULL;
-    }
-
-    return &lexer->tokens[lexer->pos + offset];
 }
 
 tok_type_t get_op_type(wchar_t op) {
@@ -65,15 +57,14 @@ void lex(src_t* src, lexer_t* lexer) {
     while (src->pos < src->size) {
         if (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_') {
             token_t* tok = &lexer->tokens[lexer->size++];
-            do  {
-                tok->data[tok->len-1] = src->buf[src->pos++];
-                tok->len++;
-                tok->data = (wchar_t*) realloc(tok->data, tok->len * sizeof(wchar_t));
+            while (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_' || isdigit(src->buf[src->pos]))  {
+                tok->data[tok->len++] = src->buf[src->pos++];
+                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
                 if (tok->data == NULL) {
                     wprintf(L"Failed to resize data\n");
                     exit(1);
                 }
-            } while (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_' || isdigit(src->buf[src->pos]));
+            }
             tok->data[tok->len] = L'\0';
             tok->type = (is_keyword(tok->data))? TOK_KEYWORD : TOK_ID;
 
@@ -81,7 +72,7 @@ void lex(src_t* src, lexer_t* lexer) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = TOK_NUM;
             int period = 0;
-            do {
+            while (isdigit(src->buf[src->pos]) || src->buf[src->pos] == L'.') {
                 if (src->buf[src->pos] == L'.') {
                     if (period) {
                         wprintf(L"Error: Invalid number format\n");
@@ -90,29 +81,28 @@ void lex(src_t* src, lexer_t* lexer) {
                         period = 1;
                     }
                 }
-                tok->data[tok->len-1] = src->buf[src->pos++];
-                tok->len++;
-                tok->data = (wchar_t*) realloc(tok->data, tok->len * sizeof(wchar_t));
+                tok->data[tok->len++] = src->buf[src->pos++];
+                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
                 if (tok->data == NULL) {
                     wprintf(L"Failed to resize data\n");
                     exit(1);
                 }
-            } while (isdigit(src->buf[src->pos]) || src->buf[src->pos] == L'.');
+            }
             tok->data[tok->len] = L'\0';
 
         } else if (isop(src->buf[src->pos])) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = get_op_type(src->buf[src->pos]);
-            do {
-                tok->data[tok->len-1] = src->buf[src->pos++];
-                tok->len++;
-                tok->data = (wchar_t*) realloc(tok->data, tok->len * sizeof(wchar_t));
+            while (isop(src->buf[src->pos])) {
+                tok->data[tok->len++] = src->buf[src->pos++];
+                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
                 if (tok->data == NULL) {
                     wprintf(L"Failed to resize data\n");
                     exit(1);
                 }
-            } while (isop(src->buf[src->pos]));
+            }
             tok->data[tok->len] = L'\0';
+            
         } else if (src->buf[src->pos] == L'\n') {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = TOK_NEWLINE;
@@ -142,6 +132,14 @@ void lex(src_t* src, lexer_t* lexer) {
     token_t* tok = &lexer->tokens[lexer->size++];
     tok->type = TOK_EOF;
     tok->data = L'\0';
+}
+
+void print_tokens(lexer_t* lexer) {
+    int i;
+    wprintf(L"%d\n", lexer->size);
+    for (i = 0; i < lexer->size; i++) {
+        wprintf(L"`%ls` of length %d type %d\n", lexer->tokens[i].data, lexer->tokens[i].len, lexer->tokens[i].type);
+    }
 }
 
 void free_lexer(lexer_t* lexer) {

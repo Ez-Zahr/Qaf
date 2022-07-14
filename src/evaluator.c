@@ -1,118 +1,163 @@
 #include "../include/evaluator.h"
 
-node_t* get_primary_expr(node_t* node, vars_t* vars) {
-    switch (node->tok->type) {
-        case TOK_ID: {
-            if (is_var(vars, node->tok->data)) {
-                node->tok = get_var_val(vars, node->tok->data);
-                return node;
+obj_t* get_prim_expr(obj_t* obj, vars_t* vars) {
+    switch (obj->type) {
+        case OBJ_STR: {
+            if (is_var(vars, (wchar_t*)obj->data)) {
+                obj_t* var_val = get_var(vars, (wchar_t*)obj->data);
+                free_obj(obj);
+                return var_val;
             } else {
-                wprintf(L"Error: Undefined variable `%ls`\n", node->tok->data);
+                wprintf(L"Error: Undefiend variable `%ls`\n", obj->data);
                 exit(1);
             }
         }
-
-        case TOK_NUM:
-            return node;
         
         default:
-            wprintf(L"Error: Invalid primary expression\n");
-            exit(1);
+            return obj;
     }
 }
 
-node_t* _eval(node_t* node, vars_t* vars) {
+obj_t* _eval(node_t* node, vars_t* vars) {
     if (node == NULL) {
-        return NULL;
+        obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+        obj->type = OBJ_NULL;
+        return obj;
     }
-
+    
     switch (node->tok->type) {
         case TOK_ID: {
-            return node;
+            obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_STR;
+            obj->data = calloc(node->tok->len + 1, sizeof(wchar_t));
+            wcscpy((wchar_t*)obj->data, node->tok->data);
+            return obj;
         }
 
         case TOK_KEYWORD: {
+            obj_t* obj;
             if (!wcscmp(node->tok->data, L"اطبع")) {
-                node_t* left = get_primary_expr(_eval(node->left, vars), vars);
-                wprintf(L"%d\n", left->tok->val);
+                obj = get_prim_expr(_eval(node->left, vars), vars);
+                wprintf(L"%d\n", *(int*)obj->data);
+                free_obj(obj);
             }
+
+            obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_NULL;
+            return obj;
         }
         
         case TOK_NUM: {
+            obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_INT;
+            obj->data = calloc(1, sizeof(int));
             char buf[32];
             wcstombs(buf, node->tok->data, 32);
-            node->tok->val = atoi(buf);
-            return node;
+            *(int*)obj->data = atoi(buf);
+            return obj;
         }
 
         case TOK_ASSIGN: {
-            node_t* left = _eval(node->left, vars);
-            node_t* right = get_primary_expr(_eval(node->right, vars), vars);
-            if (left == NULL || right == NULL || left->tok->type != TOK_ID || right->tok->type != TOK_NUM) {
-                wprintf(L"Error: Invalid operand to `+` operator\n");
+            obj_t* var_id = _eval(node->left, vars);
+            obj_t* var_val = get_prim_expr(_eval(node->right, vars), vars);
+            if (var_id->type != OBJ_STR || var_val->type != OBJ_INT) {
+                wprintf(L"Error: Invalid operand to `=` operator\n");
                 exit(1);
             }
-            if (is_var(vars, left->tok->data)) {
-                update_var(vars, left->tok->data, right->tok);
+            
+            if (is_var(vars, var_id->data)) {
+                update_var(vars, var_id->data, var_val);
             } else {
-                add_var(vars, left->tok->data, right->tok);
+                add_var(vars, var_id->data, var_val);
             }
-            return right;
+
+            free_obj(var_id);
+            obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_NULL;
+            return obj;
         }
 
         case TOK_PLUS: {
-            node_t* left = get_primary_expr(_eval(node->left, vars), vars);
-            node_t* right = get_primary_expr(_eval(node->right, vars), vars);
-            if (left == NULL || right == NULL || left->tok->type != TOK_NUM || right->tok->type != TOK_NUM) {
-                wprintf(L"Error: Invalid operand to `+` operator\n");
+            obj_t* left = get_prim_expr(_eval(node->left, vars), vars);
+            obj_t* right = get_prim_expr(_eval(node->right, vars), vars);
+            if (left->type != OBJ_INT || right->type != OBJ_INT) {
+                wprintf(L"Error: Invalid operand to `+` operator %d %d\n", left->type, right->type);
                 exit(1);
             }
-            node->tok->val = left->tok->val + right->tok->val;
-            node->tok->type = TOK_NUM;
-            return node;
+
+            obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_INT;
+            obj->data = calloc(1, sizeof(int));
+            *(int*)obj->data = (*(int*)left->data) + (*(int*)right->data);
+            
+            free_obj(left);
+            free_obj(right);
+            return obj;
         }
 
         case TOK_MINUS: {
-            node_t* left = get_primary_expr(_eval(node->left, vars), vars);
-            node_t* right = get_primary_expr(_eval(node->right, vars), vars);
-            if (left == NULL || right == NULL || left->tok->type != TOK_NUM || right->tok->type != TOK_NUM) {
+            obj_t* left = get_prim_expr(_eval(node->left, vars), vars);
+            obj_t* right = get_prim_expr(_eval(node->right, vars), vars);
+            if (left->type != OBJ_INT || right->type != OBJ_INT) {
                 wprintf(L"Error: Invalid operand to `-` operator\n");
                 exit(1);
             }
-            node->tok->val = left->tok->val - right->tok->val;
-            node->tok->type = TOK_NUM;
-            return node;
+
+            obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_INT;
+            obj->data = calloc(1, sizeof(int));
+            *(int*)obj->data = (*(int*)left->data) - (*(int*)right->data);
+            
+            free_obj(left);
+            free_obj(right);
+            return obj;
         }
 
         case TOK_MUL: {
-            node_t* left = get_primary_expr(_eval(node->left, vars), vars);
-            node_t* right = get_primary_expr(_eval(node->right, vars), vars);
-            if (left == NULL || right == NULL || left->tok->type != TOK_NUM || right->tok->type != TOK_NUM) {
+            obj_t* left = get_prim_expr(_eval(node->left, vars), vars);
+            obj_t* right = get_prim_expr(_eval(node->right, vars), vars);
+            if (left->type != OBJ_INT || right->type != OBJ_INT) {
                 wprintf(L"Error: Invalid operand to `*` operator\n");
                 exit(1);
             }
-            node->tok->val = left->tok->val * right->tok->val;
-            node->tok->type = TOK_NUM;
-            return node;
+
+            obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_INT;
+            obj->data = calloc(1, sizeof(int));
+            *(int*)obj->data = (*(int*)left->data) * (*(int*)right->data);
+            
+            free_obj(left);
+            free_obj(right);
+            return obj;
         }
 
         case TOK_DIV: {
-            node_t* left = get_primary_expr(_eval(node->left, vars), vars);
-            node_t* right = get_primary_expr(_eval(node->right, vars), vars);
-            if (left == NULL || right == NULL || left->tok->type != TOK_NUM || right->tok->type != TOK_NUM) {
+            obj_t* left = get_prim_expr(_eval(node->left, vars), vars);
+            obj_t* right = get_prim_expr(_eval(node->right, vars), vars);
+            if (left->type != OBJ_INT || right->type != OBJ_INT) {
                 wprintf(L"Error: Invalid operand to `/` operator\n");
                 exit(1);
             }
-            node->tok->val = left->tok->val / right->tok->val;
-            node->tok->type = TOK_NUM;
-            return node;
+
+            obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_INT;
+            obj->data = calloc(1, sizeof(int));
+            *(int*)obj->data = (*(int*)left->data) / (*(int*)right->data);
+            
+            free_obj(left);
+            free_obj(right);
+            return obj;
         }
 
-        default:
-            return NULL;
+        default: {
+            obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
+            obj->type = OBJ_NULL;
+            return obj;
+        }
     }
 }
 
-void eval(parser_t* parser) {
-    _eval(parser->parseTree, parser->vars);
+void eval(parser_t* parser, vars_t* vars) {
+    obj_t* obj = _eval(parser->parseTree, vars);
+    free_obj(obj);
 }

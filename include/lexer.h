@@ -23,7 +23,6 @@ typedef struct {
     wchar_t* data;
     int len;
     tok_type_t type;
-    int val;
 } token_t;
 
 typedef struct {
@@ -34,8 +33,8 @@ typedef struct {
 } lexer_t;
 
 void init_lexer(lexer_t* lexer);
-token_t* peek(lexer_t* lexer, int offset);
 void lex(src_t* src, lexer_t* lexer);
+void print_tokens(lexer_t* lexer);
 void free_lexer(lexer_t* lexer);
 
 #endif
