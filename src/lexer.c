@@ -106,7 +106,7 @@ void lex(src_t* src, lexer_t* lexer) {
         } else if (src->buf[src->pos] == L'\n') {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = TOK_NEWLINE;
-            tok->len = 2;
+            tok->len = 1;
             tok->data = (wchar_t*) realloc(tok->data, 2 * sizeof(wchar_t));
             if (tok->data == NULL) {
                 wprintf(L"Failed to resize data\n");
@@ -131,12 +131,10 @@ void lex(src_t* src, lexer_t* lexer) {
 
     token_t* tok = &lexer->tokens[lexer->size++];
     tok->type = TOK_EOF;
-    tok->data = L'\0';
 }
 
 void print_tokens(lexer_t* lexer) {
     int i;
-    wprintf(L"%d\n", lexer->size);
     for (i = 0; i < lexer->size; i++) {
         wprintf(L"`%ls` of length %d type %d\n", lexer->tokens[i].data, lexer->tokens[i].len, lexer->tokens[i].type);
     }
