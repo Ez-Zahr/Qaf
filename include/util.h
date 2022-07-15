@@ -19,6 +19,7 @@ typedef struct {
 typedef enum {
     OBJ_NULL,
     OBJ_INT,
+    OBJ_BOOL,
     OBJ_CHAR,
     OBJ_STR
 } obj_type_t;
@@ -47,6 +48,7 @@ void init_src(src_t* src);
 void read_src(char* filename, src_t* src);
 void free_src(src_t* src);
 
+void print_obj(obj_t* obj, int newline);
 void free_obj(obj_t* obj);
 
 void init_vars(vars_t* vars);

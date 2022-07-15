@@ -22,6 +22,24 @@ void init_lexer(lexer_t* lexer) {
     }
 }
 
+tok_type_t get_keyword_type(wchar_t* keyword) {
+    if (!wcscmp(keyword, L"اطبع")) {
+        return TOK_PRINT;
+    } else if (!wcscmp(keyword, L"صح")) {
+        return TOK_TRUE;
+    } else if (!wcscmp(keyword, L"خطأ")) {
+        return TOK_FALSE;
+    } else if (!wcscmp(keyword, L"أو")) {
+        return TOK_OR;
+    } else if (!wcscmp(keyword, L"و")) {
+        return TOK_AND;
+    } else if (!wcscmp(keyword, L"ليس")) {
+        return TOK_NOT;
+    }
+
+    return TOK_ID;
+}
+
 tok_type_t get_op_type(wchar_t op) {
     switch (op)
     {
@@ -45,14 +63,6 @@ tok_type_t get_op_type(wchar_t op) {
     }
 }
 
-int is_keyword(wchar_t* id) {
-    if (!wcscmp(id, L"اطبع")) {
-        return 1;
-    }
-
-    return 0;
-}
-
 void lex(src_t* src, lexer_t* lexer) {
     while (src->pos < src->size) {
         if (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_') {
@@ -66,7 +76,7 @@ void lex(src_t* src, lexer_t* lexer) {
                 }
             }
             tok->data[tok->len] = L'\0';
-            tok->type = (is_keyword(tok->data))? TOK_KEYWORD : TOK_ID;
+            tok->type = get_keyword_type(tok->data);
 
         } else if (isdigit(src->buf[src->pos]) || src->buf[src->pos] == L'.') {
             token_t* tok = &lexer->tokens[lexer->size++];

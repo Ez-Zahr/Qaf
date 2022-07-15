@@ -62,6 +62,27 @@ void free_src(src_t* src) {
     free(src->buf);
 }
 
+void print_obj(obj_t* obj, int newline) {
+    switch (obj->type) {
+        case OBJ_INT:
+            wprintf(L"%d", *(int*)obj->data);
+            break;
+        case OBJ_BOOL:
+            wprintf(L"%ls", (*(int*)obj->data)? L"صح":L"خطأ");
+            break;
+        case OBJ_CHAR:
+            wprintf(L"%lc", *(wchar_t*)obj->data);
+            break;
+        case OBJ_STR:
+            wprintf(L"%ls", (wchar_t*)obj->data);
+            break;
+    }
+
+    if (newline) {
+        wprintf(L"\n");
+    }
+}
+
 void free_obj(obj_t* obj) {
     if (obj->type != OBJ_NULL) {
         free(obj->data);
@@ -120,6 +141,12 @@ void copy_obj(obj_t* dest, obj_t* src) {
     switch (src->type) {
         case OBJ_INT:
             dest->type = OBJ_INT;
+            dest->data = calloc(1, sizeof(int));
+            *(int*)dest->data = *(int*)src->data;
+            break;
+
+        case OBJ_BOOL:
+            dest->type = OBJ_BOOL;
             dest->data = calloc(1, sizeof(int));
             *(int*)dest->data = *(int*)src->data;
             break;

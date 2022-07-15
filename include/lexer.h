@@ -5,15 +5,22 @@
 
 typedef enum {
     TOK_ID,
-    TOK_KEYWORD,
+
+    TOK_PRINT,
 
     TOK_NUM,
+    TOK_TRUE,
+    TOK_FALSE,
     
     TOK_ASSIGN,
     TOK_PLUS,
     TOK_MINUS,
     TOK_MUL,
     TOK_DIV,
+
+    TOK_OR,
+    TOK_AND,
+    TOK_NOT,
 
     TOK_NEWLINE,
     TOK_EOF

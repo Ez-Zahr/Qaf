@@ -4,8 +4,45 @@ void init_parser(parser_t* parser) {
     parser->parseTree = NULL;
 }
 
+int get_op_priority(tok_type_t op) {
+    switch (op) {
+        case TOK_ASSIGN:
+            return 0;
+        
+        case TOK_PLUS:
+        case TOK_MINUS:
+        case TOK_AND:
+        case TOK_OR:
+            return 1;
+        
+        case TOK_MUL:
+        case TOK_DIV:
+            return 2;
+        
+        case TOK_NOT:
+            return 3;
+    }
+
+    return -1;
+}
+
+node_t* parse_unary_expr(lexer_t* lexer) {
+    switch (lexer->tokens[lexer->pos].type) {
+        case TOK_NOT: {
+            node_t* unary_expr = (node_t*) calloc(1, sizeof(node_t));
+            unary_expr->tok = &lexer->tokens[lexer->pos++];
+            return unary_expr;
+        }
+
+        default:
+            return NULL;
+    }
+}
+
 node_t* parse_primary_expr(lexer_t* lexer) {
     switch (lexer->tokens[lexer->pos].type) {
+        case TOK_TRUE:
+        case TOK_FALSE:
         case TOK_NUM: {
             node_t* prim_node = (node_t*) calloc(1, sizeof(node_t));
             prim_node->tok = &lexer->tokens[lexer->pos++];
@@ -18,8 +55,10 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             return prim_node;
         }
 
-        case TOK_KEYWORD: {
-            break;
+        case TOK_NOT: {
+            node_t* unary_expr = parse_unary_expr(lexer);
+            unary_expr->left = parse_primary_expr(lexer);
+            return unary_expr;
         }
         
         case TOK_NEWLINE:
@@ -35,7 +74,7 @@ node_t* parse_primary_expr(lexer_t* lexer) {
 node_t* parse_factor(lexer_t* lexer) {
     node_t* expr = parse_primary_expr(lexer);
     
-    while (lexer->tokens[lexer->pos].type == TOK_MUL || lexer->tokens[lexer->pos].type == TOK_DIV) {
+    while (get_op_priority(lexer->tokens[lexer->pos].type) == 2) {
         node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
         op_node->tok = &lexer->tokens[lexer->pos++];
         op_node->left = expr;
@@ -49,7 +88,7 @@ node_t* parse_factor(lexer_t* lexer) {
 node_t* parse_term(lexer_t* lexer) {
     node_t* expr = parse_factor(lexer);
     
-    while (lexer->tokens[lexer->pos].type == TOK_PLUS || lexer->tokens[lexer->pos].type == TOK_MINUS) {
+    while (get_op_priority(lexer->tokens[lexer->pos].type) == 1) {
         node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
         op_node->tok = &lexer->tokens[lexer->pos++];
         op_node->left = expr;
@@ -61,7 +100,7 @@ node_t* parse_term(lexer_t* lexer) {
 }
 
 void parse(lexer_t* lexer, parser_t* parser) {
-    if (lexer->tokens[lexer->pos].type == TOK_KEYWORD) {
+    if (lexer->tokens[lexer->pos].type == TOK_PRINT) {
         node_t* keyword_node = (node_t*) calloc(1, sizeof(node_t));
         keyword_node->tok = &lexer->tokens[lexer->pos++];
         keyword_node->left = parse_term(lexer);
