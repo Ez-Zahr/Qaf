@@ -51,7 +51,7 @@ obj_t* _eval(node_t* node, vars_t* vars) {
             return obj;
         }
         
-        case TOK_NUM: {
+        case TOK_INT: {
             obj_t* obj = (obj_t*) calloc(1, sizeof(obj_t));
             obj->type = OBJ_INT;
             obj->data = calloc(1, sizeof(int));
@@ -229,7 +229,7 @@ obj_t* _eval(node_t* node, vars_t* vars) {
     }
 }
 
-void eval(parser_t* parser, vars_t* vars) {
-    obj_t* obj = _eval(parser->parseTree, vars);
+void eval(node_t* parseTree, vars_t* vars) {
+    obj_t* obj = _eval(parseTree, vars);
     free_obj(obj);
 }

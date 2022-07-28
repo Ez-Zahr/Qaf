@@ -12,14 +12,6 @@ wchar_t* wcsrev(wchar_t* str) {
     return str;
 }
 
-int isaralpha(wchar_t c) {
-    return (0x600 <= c && c <= 0x6ff);
-}
-
-int isop(wchar_t c) {
-    return (c == L'=' || c == L'+' || c == L'-' || c == L'*' || c == L'/');
-}
-
 void init_src(src_t* src) {
     src->cap = 1024;
     src->size = 0;

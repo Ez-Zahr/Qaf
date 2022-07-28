@@ -41,8 +41,6 @@ typedef struct {
 } vars_t;
 
 wchar_t* wcsrev(wchar_t* str);
-int isaralpha(wchar_t c);
-int isop(wchar_t c);
 
 void init_src(src_t* src);
 void read_src(char* filename, src_t* src);

@@ -10,12 +10,14 @@ typedef struct node_t {
 } node_t;
 
 typedef struct {
-    node_t* parseTree;
+    node_t** parseTrees;
+    int cap;
+    int size;
 } parser_t;
 
 void init_parser(parser_t* parser);
-void parse(lexer_t* lexer, parser_t* parser);
-void print_tree(node_t* node, int indent);
+node_t* parse(lexer_t* lexer);
+void print_parser(parser_t* parser);
 void free_parser(parser_t* parser);
 
 #endif

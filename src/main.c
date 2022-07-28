@@ -10,7 +10,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc < 2) {
-        wprintf(L"Please specify a source file (./qaf <filename>)\n");
+        wprintf(L"Please specify a .qaf input file (./qaf <filename>.qaf)\n");
         return 1;
     }
 
@@ -28,21 +28,23 @@ int main(int argc, char* argv[]) {
     // print_tokens(&lexer);
 
     while (1) {
-        if (lexer.tokens[lexer.pos].type == TOK_NEWLINE) {
+        if (lexer.tokens[lexer.pos].type == TOK_SEMI) {
             lexer.pos++;
             continue;
         } else if (lexer.tokens[lexer.pos].type == TOK_EOF) {
             break;
         }
         
-        parse(&lexer, &parser);
-        // print_tree(parser.parseTree, 0);
-        
-        eval(&parser, &vars);
-        // print_vars(&vars); wprintf(L"\n");
-        
-        free_parser(&parser);
+        parser.parseTrees[parser.size++] = parse(&lexer);
+        if (parser.size >= parser.cap) {
+            parser.cap *= 2;
+            parser.parseTrees = (node_t**) realloc(parser.parseTrees, parser.cap * sizeof(node_t*));
+        }
     }
+    // print_parser(&parser);
+
+    // eval(&parser, &vars);
+    // print_vars(&vars); wprintf(L"\n");
 
     free_src(&src);
     free_lexer(&lexer);

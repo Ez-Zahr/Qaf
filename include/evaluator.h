@@ -3,6 +3,6 @@
 
 #include "parser.h"
 
-void eval(parser_t* parser, vars_t* vars);
+void eval(node_t* parseTree, vars_t* vars);
 
 #endif

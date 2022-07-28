@@ -8,7 +8,8 @@ typedef enum {
 
     TOK_PRINT,
 
-    TOK_NUM,
+    TOK_INT,
+    TOK_FLOAT,
     TOK_TRUE,
     TOK_FALSE,
     
@@ -18,11 +19,17 @@ typedef enum {
     TOK_MUL,
     TOK_DIV,
 
+    TOK_EQ,
+    TOK_LT,
+    TOK_LTE,
+    TOK_GT,
+    TOK_GTE,
+    
     TOK_OR,
     TOK_AND,
     TOK_NOT,
 
-    TOK_NEWLINE,
+    TOK_SEMI,
     TOK_EOF
 } tok_type_t;
 
