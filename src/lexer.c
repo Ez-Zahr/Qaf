@@ -6,8 +6,7 @@ void init_lexer(lexer_t* lexer) {
     lexer->pos = 0;
     lexer->tokens = (token_t*) calloc(lexer->cap, sizeof(token_t));
 
-    int i;
-    for (i = 0; i < lexer->cap; i++) {
+    for (int i = 0; i < lexer->cap; i++) {
         lexer->tokens[i].len = 0;
         lexer->tokens[i].data = (wchar_t*) calloc(1, sizeof(wchar_t));
     }
@@ -17,8 +16,7 @@ int isaralpha(wchar_t c) {
     return (0x600 <= c && c <= 0x6ff && c != L'؛');
 }
 
-tok_type_t get_keyword_type(wchar_t* keyword)
-{
+tok_type_t get_keyword_type(wchar_t* keyword) {
     if (!wcscmp(keyword, L"اطبع")) {
         return TOK_PRINT;
     } else if (!wcscmp(keyword, L"صح")) {
@@ -32,12 +30,11 @@ tok_type_t get_keyword_type(wchar_t* keyword)
     } else if (!wcscmp(keyword, L"ليس")) {
         return TOK_NOT;
     }
-
     return TOK_ID;
 }
 
 int isop(wchar_t c) {
-    return (c == L'=' || c == L'+' || c == L'-' || c == L'*' || c == L'/' || c == L'<' || c == L'>');
+    return (c == L'=' || c == L'+' || c == L'-' || c == L'*' || c == L'/' || c == L'<' || c == L'>' || c == L'!');
 }
 
 tok_type_t get_op_type(wchar_t* op) {
@@ -53,6 +50,8 @@ tok_type_t get_op_type(wchar_t* op) {
         return TOK_DIV;
     } else if (!wcscmp(op, L"==")) {
         return TOK_EQ;
+    } else if (!wcscmp(op, L"!=")) {
+        return TOK_NE;
     } else if (!wcscmp(op, L"<")) {
         return TOK_LT;
     } else if (!wcscmp(op, L"<=")) {
@@ -68,12 +67,13 @@ tok_type_t get_op_type(wchar_t* op) {
 }
 
 void skip_whitespace(src_t* src) {
-    while (isspace(src->buf[src->pos])) {
+    while (isspace(src->buf[src->pos]) && src->buf[src->pos] != L'\n') {
         src->pos++;
     }
 }
 
 void lex(src_t* src, lexer_t* lexer) {
+    int line = 1;
     while (1) {
         skip_whitespace(src);
 
@@ -127,8 +127,12 @@ void lex(src_t* src, lexer_t* lexer) {
             tok->data[1] = L'\0';
             src->pos++;
 
+        } else if (src->buf[src->pos] == L'\n') {
+            line++;
+            src->pos++;
+
         } else {
-            wprintf(L"Error: Undefined symbol `%lc` at %d\n", src->buf[src->pos], src->pos);
+            wprintf(L"Error: Undefined symbol `%lc` at %d:%d\n", src->buf[src->pos], line, src->pos);
             exit(1);
         }
 
@@ -168,6 +172,8 @@ wchar_t* tok_type_to_str(tok_type_t type) {
             return L"TOK_DIV";
         case TOK_EQ:
             return L"TOK_EQ";
+        case TOK_NE:
+            return L"TOK_NE";
         case TOK_LT:
             return L"TOK_LT";
         case TOK_LTE:
@@ -186,19 +192,19 @@ wchar_t* tok_type_to_str(tok_type_t type) {
             return L"TOK_SEMI";
         case TOK_EOF:
             return L"TOK_EOF";
+        default:
+            return L"Undefined type string";
     }
 }
 
 void print_tokens(lexer_t *lexer) {
-    int i;
-    for (i = 0; i < lexer->size; i++) {
+    for (int i = 0; i < lexer->size; i++) {
         wprintf(L"`%ls`, len %d, type `%ls`\n", lexer->tokens[i].data, lexer->tokens[i].len, tok_type_to_str(lexer->tokens[i].type));
     }
 }
 
 void free_lexer(lexer_t *lexer) {
-    int i;
-    for (i = 0; i < lexer->cap; i++) {
+    for (int i = 0; i < lexer->cap; i++) {
         free(lexer->tokens[i].data);
     }
     free(lexer->tokens);

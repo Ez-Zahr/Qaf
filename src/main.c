@@ -1,6 +1,7 @@
 #include "../include/util.h"
 #include "../include/lexer.h"
 #include "../include/parser.h"
+#include "../include/compiler.h"
 #include "../include/evaluator.h"
 
 int main(int argc, char* argv[]) {
@@ -43,8 +44,7 @@ int main(int argc, char* argv[]) {
     }
     // print_parser(&parser);
 
-    // eval(&parser, &vars);
-    // print_vars(&vars); wprintf(L"\n");
+    // compile(&parser);
 
     free_src(&src);
     free_lexer(&lexer);

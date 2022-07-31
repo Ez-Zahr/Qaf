@@ -4,9 +4,8 @@
 #include "util.h"
 
 typedef enum {
-    TOK_ID,
-
     TOK_PRINT,
+    TOK_ID,
 
     TOK_INT,
     TOK_FLOAT,
@@ -19,15 +18,16 @@ typedef enum {
     TOK_MUL,
     TOK_DIV,
 
+    TOK_AND,
+    TOK_OR,
+    TOK_NOT,
+
     TOK_EQ,
+    TOK_NE,
     TOK_LT,
     TOK_LTE,
     TOK_GT,
     TOK_GTE,
-    
-    TOK_OR,
-    TOK_AND,
-    TOK_NOT,
 
     TOK_SEMI,
     TOK_EOF
@@ -48,6 +48,7 @@ typedef struct {
 
 void init_lexer(lexer_t* lexer);
 void lex(src_t* src, lexer_t* lexer);
+wchar_t* tok_type_to_str(tok_type_t type);
 void print_tokens(lexer_t* lexer);
 void free_lexer(lexer_t* lexer);
 

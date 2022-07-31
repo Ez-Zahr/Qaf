@@ -9,20 +9,27 @@ void init_parser(parser_t* parser) {
 int get_op_priority(tok_type_t op) {
     switch (op) {
         case TOK_ASSIGN:
-            return 0;
+            return PRI_ASSIGN;
+        
+        case TOK_EQ:
+        case TOK_NE:
+        case TOK_LT:
+        case TOK_LTE:
+        case TOK_GT:
+        case TOK_GTE:
+            return PRI_CMP;
+        
+        case TOK_AND:
+        case TOK_OR:
+            return PRI_AND_OR;
         
         case TOK_PLUS:
         case TOK_MINUS:
-        case TOK_AND:
-        case TOK_OR:
-            return 1;
+            return PRI_ADD_SUB;
         
         case TOK_MUL:
         case TOK_DIV:
-            return 2;
-        
-        case TOK_NOT:
-            return 3;
+            return PRI_MUL_DIV;
         
         default:
             return -1;
@@ -49,34 +56,21 @@ node_t* parse_primary_expr(lexer_t* lexer) {
         }
 
         default: {
-            wprintf(L"Error: Invalid token `%ls` of type `%d`\n", lexer->tokens[lexer->pos].data, lexer->tokens[lexer->pos].type);
+            token_t tok = lexer->tokens[lexer->pos];
+            wprintf(L"Error: Invalid token `%ls` of type `%d`\n", tok.data, tok_type_to_str(tok.type));
             exit(1);
         }
     }
 }
 
-node_t* parse_factor(lexer_t* lexer) {
-    node_t* expr = parse_primary_expr(lexer);
+node_t* _parse(lexer_t* lexer, int prior) {
+    node_t* expr = (prior == PRI_MAX - 1)? parse_primary_expr(lexer) : _parse(lexer, prior + 1);
     
-    while (get_op_priority(lexer->tokens[lexer->pos].type) == 2) {
+    while (get_op_priority(lexer->tokens[lexer->pos].type) == prior) {
         node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
         op_node->tok = &lexer->tokens[lexer->pos++];
         op_node->left = expr;
-        op_node->right = parse_primary_expr(lexer);
-        expr = op_node;
-    }
-
-    return expr;
-}
-
-node_t* parse_term(lexer_t* lexer) {
-    node_t* expr = parse_factor(lexer);
-    
-    while (get_op_priority(lexer->tokens[lexer->pos].type) == 1) {
-        node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
-        op_node->tok = &lexer->tokens[lexer->pos++];
-        op_node->left = expr;
-        op_node->right = parse_factor(lexer);
+        op_node->right = (prior == PRI_MAX - 1)? parse_primary_expr(lexer) : _parse(lexer, prior + 1);
         expr = op_node;
     }
 
@@ -89,21 +83,11 @@ node_t* parse(lexer_t* lexer) {
     if (lexer->tokens[lexer->pos].type == TOK_PRINT) {
         expr = (node_t*) calloc(1, sizeof(node_t));
         expr->tok = &lexer->tokens[lexer->pos++];
-        expr->left = parse_term(lexer);
+        expr->left = _parse(lexer, 1);
         return expr;
     }
 
-    expr = parse_term(lexer);
-    
-    if (lexer->tokens[lexer->pos].type == TOK_ASSIGN) {
-        node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
-        op_node->tok = &lexer->tokens[lexer->pos++];
-        op_node->left = expr;
-        op_node->right = parse_term(lexer);
-        expr = op_node;
-    }
-
-    return expr;
+    return _parse(lexer, 0);
 }
 
 void print_tree(node_t* node, int indent) {
@@ -112,8 +96,7 @@ void print_tree(node_t* node, int indent) {
     }
 
     wprintf(L"%d: ", indent);
-    int i;
-    for (i = 0; i < indent; i++) {
+    for (int i = 0; i < indent; i++) {
         wprintf(L" ");
     }
     
@@ -123,8 +106,7 @@ void print_tree(node_t* node, int indent) {
 }
 
 void print_parser(parser_t* parser) {
-    int i;
-    for (i = 0; i < parser->size; i++) {
+    for (int i = 0; i < parser->size; i++) {
         print_tree(parser->parseTrees[i], 0);
     }
 }
@@ -140,8 +122,7 @@ void free_parse_tree(node_t* node) {
 }
 
 void free_parser(parser_t* parser) {
-    int i;
-    for (i = 0; i < parser->size; i++) {
+    for (int i = 0; i < parser->size; i++) {
         free_parse_tree(parser->parseTrees[i]);
     }
     free(parser->parseTrees);

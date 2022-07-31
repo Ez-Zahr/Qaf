@@ -3,6 +3,15 @@
 
 #include "lexer.h"
 
+typedef enum {
+    PRI_ASSIGN,
+    PRI_CMP,
+    PRI_AND_OR,
+    PRI_ADD_SUB,
+    PRI_MUL_DIV,
+    PRI_MAX
+} op_prior_t;
+
 typedef struct node_t {
     token_t* tok;
     struct node_t* left;
