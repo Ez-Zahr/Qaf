@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
     }
     // print_parser(&parser);
 
-    // compile(&parser);
+    compile(&parser);
 
     free_src(&src);
     free_lexer(&lexer);
