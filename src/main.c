@@ -2,7 +2,6 @@
 #include "../include/lexer.h"
 #include "../include/parser.h"
 #include "../include/compiler.h"
-#include "../include/evaluator.h"
 
 int main(int argc, char* argv[]) {
     if (setlocale(LC_ALL, "ar_SA.utf8") == NULL) {
@@ -10,7 +9,21 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (argc < 2) {
+    int _t = 0, _p = 0;
+    char* filename = 0;
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-t")) {
+            _t = 1;
+        } else if (!strcmp(argv[i], "-p")) {
+            _p = 1;
+        } else if (endsWith(argv[i], ".qaf")) {
+            filename = argv[i];
+        } else {
+            wprintf(L"Error: Unknown argument '%s'\n", argv[i]);
+            return 1;
+        }
+    }
+    if (!filename) {
         wprintf(L"Please specify a .qaf input file (./qaf <filename>.qaf)\n");
         return 1;
     }
@@ -21,34 +34,23 @@ int main(int argc, char* argv[]) {
     init_lexer(&lexer);
     parser_t parser;
     init_parser(&parser);
-    vars_t vars;
-    init_vars(&vars);
     
-    read_src(argv[1], &src);
-    lex(&src, &lexer);
-    // print_tokens(&lexer);
+    read_src(filename, &src);
 
-    while (1) {
-        if (lexer.tokens[lexer.pos].type == TOK_SEMI) {
-            lexer.pos++;
-            continue;
-        } else if (lexer.tokens[lexer.pos].type == TOK_EOF) {
-            break;
-        }
-        
-        parser.parseTrees[parser.size++] = parse(&lexer);
-        if (parser.size >= parser.cap) {
-            parser.cap *= 2;
-            parser.parseTrees = (node_t**) realloc(parser.parseTrees, parser.cap * sizeof(node_t*));
-        }
+    lex(&src, &lexer);
+    if (_t) {
+        print_tokens(&lexer);
     }
-    // print_parser(&parser);
+
+    parse(&lexer, &parser);
+    if (_p) {
+        print_parser(&parser);
+    }
 
     compile(&parser);
 
     free_src(&src);
     free_lexer(&lexer);
     free_parser(&parser);
-    free_vars(&vars);
     return 0;
 }

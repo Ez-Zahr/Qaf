@@ -19,13 +19,13 @@ typedef struct node_t {
 } node_t;
 
 typedef struct {
-    node_t** parseTrees;
+    node_t** astList;
     int cap;
     int size;
 } parser_t;
 
 void init_parser(parser_t* parser);
-node_t* parse(lexer_t* lexer);
+void parse(lexer_t* lexer, parser_t* parser);
 void print_parser(parser_t* parser);
 void free_parser(parser_t* parser);
 

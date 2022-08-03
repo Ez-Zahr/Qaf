@@ -1,29 +1,28 @@
 #include "../include/compiler.h"
 
-void init_rodata(sections_t* sections) {
-    sections->rodata = (char*) calloc(28, sizeof(char));
+void init_headers(sections_t* sections) {
+    sections->rodata = (char*) calloc(20, sizeof(char));
     strcat(sections->rodata, ".section .rodata\n");
+    sections->text = (char*) calloc(120, sizeof(char));
+    strcat(sections->text, ".section .text\n.globl _start\n_start:\n\tcallq _entry\n\tmovq %rax, %rdi\n\tmovq $60, %rax\n\tsyscall\n.globl _entry\n_entry:\n");
 }
 
-void init_text_prologue(sections_t* sections, context_t* context) {
-    char* text = ".section .text\n.globl _start\n_start:\n\tcall entry\n\tmov %rax, %rdi\n\tmov $60, %rax\n\tsyscall"
-    "\n.globl entry\nentry:\n\tpush %rbp\n\tmov %rsp, %rbp\n";
-    sections->text = (char*) calloc(strlen(text) + 1, sizeof(char));
-    strcat(sections->text, text);
+void init_prologue(sections_t* sections, context_t* context) {
+    sections->text = (char*) realloc(sections->text, (strlen(sections->text) + 30) * sizeof(char));
+    strcat(sections->text, "\tpushq %rbp\n\tmovq %rsp, %rbp\n");
 
     if (context->size) {
         char* alloc = (char*) calloc(24, sizeof(char));
-        sprintf(alloc, "\tsub $%d, %%rsp\n", context->size * 8);
+        sprintf(alloc, "\tsubq $%d, %%rsp\n", context->size * 8);
         sections->text = (char*) realloc(sections->text, (strlen(sections->text) + strlen(alloc) + 1) * sizeof(char));
         strcat(sections->text, alloc);
         free(alloc);
     }
 }
 
-void init_text_epilogue(sections_t* sections, context_t* context) {
-    char* text = "\tleave\n\tret\n";
+void init_epilogue(sections_t* sections, context_t* context) {
     sections->text = (char*) realloc(sections->text, (strlen(sections->text) + 16) * sizeof(char));
-    strcat(sections->text, text);
+    strcat(sections->text, "\tleaveq\n\tretq\n");
 }
 
 void free_sections(sections_t* sections) {
@@ -64,9 +63,8 @@ char* _compile(node_t* parseTree, context_t* context) {
     switch (parseTree->tok->type) {
         case TOK_PRINT: {
             char* left = _compile(parseTree->left, context);
-            // char* format = "\tmov $1, %%rax\n\tmov $1, %%rdi\n\tmov %s, %%rsi\n\tmov %s, %%rdx\n\tsyscall\n";
             char* instr = (char*) calloc(strlen(left) + 18, sizeof(char));
-            sprintf(instr, "\tmov %s, %%rax\n", left);
+            sprintf(instr, "\tmovq %s, %%rax\n", left);
             return instr;
         }
 
@@ -103,67 +101,71 @@ char* _compile(node_t* parseTree, context_t* context) {
         case TOK_ASSIGN: {
             char* left = _compile(parseTree->left, context);
             char* right = _compile(parseTree->right, context);
-            char* instr = (char*) calloc(strlen(left) + strlen(right) + 18, sizeof(char));
-            sprintf(instr, "%s\tmov %%rax, %s\n", right, left);
+            char* instr = (char*) calloc(strlen(left) + strlen(right) + 20, sizeof(char));
+            sprintf(instr, "%s\tmovq %%rax, %s\n", right, left);
             free(left);
             free(right);
             return instr;
         }
 
         case TOK_PLUS: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tadd %s, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\taddq %s, %%rax\n");
         }
 
         case TOK_MINUS: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tsub %s, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tsubq %s, %%rax\n");
         }
 
         case TOK_MUL: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\timul %s, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\timulq %s, %%rax\n");
         }
 
         case TOK_DIV: {
-            break;
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tmovq %s, %%rbx\n\tmovq $0, %%rdx\n\tidivq %%rbx\n");
+        }
+
+        case TOK_MOD: {
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tmovq %s, %%rbx\n\tmovq $0, %%rdx\n\tidivq %%rbx\n\tmovq %%rdx, %%rax\n");
         }
 
         case TOK_AND: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tand %s, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tandq %s, %%rax\n");
         }
 
         case TOK_OR: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tor %s, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\torq %s, %%rax\n");
         }
 
         case TOK_NOT: {
             char* left = _compile(parseTree->left, context);
             char* instr = (char*) calloc(strlen(left) + 28, sizeof(char));
-            sprintf(instr, "\tmov %s, %%rax\n\tneg %%rax\n", left);
+            sprintf(instr, "\tmovq %s, %%rax\n\tnegq %%rax\n", left);
             free(left);
             return instr;
         }
 
         case TOK_EQ: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tcmp %s, %%rax\n\tsete %%al\n\tmovzbq %%al, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tcmpq %s, %%rax\n\tsete %%al\n\tmovzbq %%al, %%rax\n");
         }
 
         case TOK_NE: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tcmp %s, %%rax\n\tsetne %%al\n\tmovzbq %%al, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tcmpq %s, %%rax\n\tsetne %%al\n\tmovzbq %%al, %%rax\n");
         }
 
         case TOK_LT: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tcmp %s, %%rax\n\tsetl %%al\n\tmovzbq %%al, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tcmpq %s, %%rax\n\tsetl %%al\n\tmovzbq %%al, %%rax\n");
         }
 
         case TOK_LTE: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tcmp %s, %%rax\n\tsetle %%al\n\tmovzbq %%al, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tcmpq %s, %%rax\n\tsetle %%al\n\tmovzbq %%al, %%rax\n");
         }
 
         case TOK_GT: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tcmp %s, %%rax\n\tsetg %%al\n\tmovzbq %%al, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tcmpq %s, %%rax\n\tsetg %%al\n\tmovzbq %%al, %%rax\n");
         }
 
         case TOK_GTE: {
-            return _compile_instr(parseTree, context, "\tmov %s, %%rax\n\tcmp %s, %%rax\n\tsetge %%al\n\tmovzbq %%al, %%rax\n");
+            return _compile_instr(parseTree, context, "\tmovq %s, %%rax\n\tcmpq %s, %%rax\n\tsetge %%al\n\tmovzbq %%al, %%rax\n");
         }
 
         default: {
@@ -198,23 +200,23 @@ void write_asm(char* filename, sections_t* sections) {
 
 void compile(parser_t* parser) {
     sections_t sections;
-    init_rodata(&sections);
+    init_headers(&sections);
     context_t context;
     init_context(&context);
 
     char* buf = (char*) calloc(1, sizeof(char));
     for (int i = 0; i < parser->size; i++) {
-        char* instr = _compile(parser->parseTrees[i], &context);
+        char* instr = _compile(parser->astList[i], &context);
         buf = (char*) realloc(buf, (strlen(buf) + strlen(instr) + 1) * sizeof(char));
         strcat(buf, instr);
     }
     
-    init_text_prologue(&sections, &context);
+    init_prologue(&sections, &context);
 
     sections.text = (char*) realloc(sections.text, (strlen(sections.text) + strlen(buf) + 1) * sizeof(char));
     strcat(sections.text, buf);
     
-    init_text_epilogue(&sections, &context);
+    init_epilogue(&sections, &context);
 
     write_asm("./a.s", &sections);
     

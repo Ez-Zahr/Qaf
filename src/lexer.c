@@ -5,11 +5,6 @@ void init_lexer(lexer_t* lexer) {
     lexer->size = 0;
     lexer->pos = 0;
     lexer->tokens = (token_t*) calloc(lexer->cap, sizeof(token_t));
-
-    for (int i = 0; i < lexer->cap; i++) {
-        lexer->tokens[i].len = 0;
-        lexer->tokens[i].data = (wchar_t*) calloc(1, sizeof(wchar_t));
-    }
 }
 
 int isaralpha(wchar_t c) {
@@ -34,7 +29,9 @@ tok_type_t get_keyword_type(wchar_t* keyword) {
 }
 
 int isop(wchar_t c) {
-    return (c == L'=' || c == L'+' || c == L'-' || c == L'*' || c == L'/' || c == L'<' || c == L'>' || c == L'!');
+    switch (c) {
+        case L'=': case L'+': case L'-': case L'*': case L'/': case L'%': case L'<': case L'>': case L'!': return 1; default: return 0;
+    }
 }
 
 tok_type_t get_op_type(wchar_t* op) {
@@ -48,6 +45,8 @@ tok_type_t get_op_type(wchar_t* op) {
         return TOK_MUL;
     } else if (!wcscmp(op, L"/")) {
         return TOK_DIV;
+    } else if (!wcscmp(op, L"%")) {
+        return TOK_MOD;
     } else if (!wcscmp(op, L"==")) {
         return TOK_EQ;
     } else if (!wcscmp(op, L"!=")) {
@@ -83,6 +82,8 @@ void lex(src_t* src, lexer_t* lexer) {
 
         if (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_') {
             token_t* tok = &lexer->tokens[lexer->size++];
+            tok->len = 0;
+            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
             do {
                 tok->data[tok->len++] = src->buf[src->pos++];
                 tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
@@ -92,6 +93,8 @@ void lex(src_t* src, lexer_t* lexer) {
 
         } else if (isdigit(src->buf[src->pos])) {
             token_t* tok = &lexer->tokens[lexer->size++];
+            tok->len = 0;
+            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
             tok->type = TOK_INT;
             int period = 0;
             do {
@@ -111,6 +114,8 @@ void lex(src_t* src, lexer_t* lexer) {
 
         } else if (isop(src->buf[src->pos])) {
             token_t* tok = &lexer->tokens[lexer->size++];
+            tok->len = 0;
+            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
             do {
                 tok->data[tok->len++] = src->buf[src->pos++];
                 tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
@@ -122,7 +127,7 @@ void lex(src_t* src, lexer_t* lexer) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = TOK_SEMI;
             tok->len = 1;
-            tok->data = (wchar_t*) realloc(tok->data, 2 * sizeof(wchar_t));
+            tok->data = (wchar_t*) calloc(2, sizeof(wchar_t));
             tok->data[0] = L'؛';
             tok->data[1] = L'\0';
             src->pos++;
@@ -170,6 +175,8 @@ wchar_t* tok_type_to_str(tok_type_t type) {
             return L"TOK_MUL";
         case TOK_DIV:
             return L"TOK_DIV";
+        case TOK_MOD:
+            return L"TOK_MOD";
         case TOK_EQ:
             return L"TOK_EQ";
         case TOK_NE:

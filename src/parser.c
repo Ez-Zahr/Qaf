@@ -3,7 +3,7 @@
 void init_parser(parser_t* parser) {
     parser->cap = 32;
     parser->size = 0;
-    parser->parseTrees = (node_t**) calloc(parser->cap, sizeof(node_t*));
+    parser->astList = (node_t**) calloc(parser->cap, sizeof(node_t*));
 }
 
 int get_op_priority(tok_type_t op) {
@@ -29,12 +29,15 @@ int get_op_priority(tok_type_t op) {
         
         case TOK_MUL:
         case TOK_DIV:
+        case TOK_MOD:
             return PRI_MUL_DIV;
         
         default:
             return -1;
     }
 }
+
+node_t* _parse(lexer_t* lexer, int prior);
 
 node_t* parse_primary_expr(lexer_t* lexer) {
     switch (lexer->tokens[lexer->pos].type) {
@@ -49,10 +52,17 @@ node_t* parse_primary_expr(lexer_t* lexer) {
         }
 
         case TOK_NOT: {
-            node_t* unary_expr = (node_t*) calloc(1, sizeof(node_t));
-            unary_expr->tok = &lexer->tokens[lexer->pos++];
-            unary_expr->left = parse_primary_expr(lexer);
-            return unary_expr;
+            node_t* expr = (node_t*) calloc(1, sizeof(node_t));
+            expr->tok = &lexer->tokens[lexer->pos++];
+            expr->left = parse_primary_expr(lexer);
+            return expr;
+        }
+
+        case TOK_PRINT: {
+            node_t* expr = (node_t*) calloc(1, sizeof(node_t));
+            expr->tok = &lexer->tokens[lexer->pos++];
+            expr->left = _parse(lexer, 1);
+            return expr;
         }
 
         default: {
@@ -77,17 +87,22 @@ node_t* _parse(lexer_t* lexer, int prior) {
     return expr;
 }
 
-node_t* parse(lexer_t* lexer) {
-    node_t* expr;
+void parse(lexer_t* lexer, parser_t* parser) {
+    while (1) {
+        if (lexer->tokens[lexer->pos].type == TOK_SEMI) {
+            lexer->pos++;
+            continue;
+        } else if (lexer->tokens[lexer->pos].type == TOK_EOF) {
+            break;
+        }
 
-    if (lexer->tokens[lexer->pos].type == TOK_PRINT) {
-        expr = (node_t*) calloc(1, sizeof(node_t));
-        expr->tok = &lexer->tokens[lexer->pos++];
-        expr->left = _parse(lexer, 1);
-        return expr;
+        parser->astList[parser->size++] = _parse(lexer, 0);
+        
+        if (parser->size >= parser->cap) {
+            parser->cap *= 2;
+            parser->astList = (node_t**) realloc(parser->astList, parser->cap * sizeof(node_t*));
+        }
     }
-
-    return _parse(lexer, 0);
 }
 
 void print_tree(node_t* node, int indent) {
@@ -107,7 +122,7 @@ void print_tree(node_t* node, int indent) {
 
 void print_parser(parser_t* parser) {
     for (int i = 0; i < parser->size; i++) {
-        print_tree(parser->parseTrees[i], 0);
+        print_tree(parser->astList[i], 0);
     }
 }
 
@@ -123,7 +138,7 @@ void free_parse_tree(node_t* node) {
 
 void free_parser(parser_t* parser) {
     for (int i = 0; i < parser->size; i++) {
-        free_parse_tree(parser->parseTrees[i]);
+        free_parse_tree(parser->astList[i]);
     }
-    free(parser->parseTrees);
+    free(parser->astList);
 }
