@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
             _t = 1;
         } else if (!strcmp(argv[i], "-p")) {
             _p = 1;
-        } else if (endsWith(argv[i], ".qaf")) {
+        } else if (endsWith(argv[i], ".qaf") && !filename) {
             filename = argv[i];
         } else {
             wprintf(L"Error: Unknown argument '%s'\n", argv[i]);

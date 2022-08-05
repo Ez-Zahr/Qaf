@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -c -g -std=c99
+CFLAGS = -c -g -std=c99 -Wall -fPIC -O3
 LDFLAGS = -g
 SRC = ${wildcard src/*.c}
 HDR = ${wildcard include/*.h}
