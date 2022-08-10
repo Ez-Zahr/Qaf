@@ -9,8 +9,7 @@ typedef enum {
 
     TOK_INT,
     TOK_FLOAT,
-    TOK_TRUE,
-    TOK_FALSE,
+    TOK_BOOL,
     
     TOK_ASSIGN,
     TOK_PLUS,
@@ -30,6 +29,8 @@ typedef enum {
     TOK_GT,
     TOK_GTE,
 
+    TOK_LPAREN,
+    TOK_RPAREN,
     TOK_SEMI,
     TOK_EOF
 } tok_type_t;

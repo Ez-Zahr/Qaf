@@ -8,6 +8,11 @@ typedef enum {
     BIND_BOOL
 } bind_type_t;
 
+typedef enum {
+    INS_OFFSET,
+    INS_COMP
+} instr_type_t;
+
 typedef struct {
     wchar_t* id;
     bind_type_t type;
@@ -20,9 +25,14 @@ typedef struct {
 } context_t;
 
 typedef struct {
-    char* text;
     char* rodata;
+    char* text;
 } sections_t;
+
+typedef struct {
+    char* instr;
+    instr_type_t type;
+} instr_t;
 
 void compile(parser_t* parser);
 

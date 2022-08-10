@@ -2,6 +2,7 @@
 #include "../include/lexer.h"
 #include "../include/parser.h"
 #include "../include/compiler.h"
+#include "../include/transpiler.h"
 
 int main(int argc, char* argv[]) {
     if (setlocale(LC_ALL, "ar_SA.utf8") == NULL) {
@@ -9,13 +10,13 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    int _t = 0, _p = 0;
+    int _t = 0, _a = 0;
     char* filename = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-t")) {
             _t = 1;
-        } else if (!strcmp(argv[i], "-p")) {
-            _p = 1;
+        } else if (!strcmp(argv[i], "-a")) {
+            _a = 1;
         } else if (endsWith(argv[i], ".qaf") && !filename) {
             filename = argv[i];
         } else {
@@ -43,14 +44,15 @@ int main(int argc, char* argv[]) {
     }
 
     parse(&lexer, &parser);
-    if (_p) {
+    if (_a) {
         print_parser(&parser);
     }
 
     compile(&parser);
+    // transpile(&parser);
 
-    free_src(&src);
-    free_lexer(&lexer);
     free_parser(&parser);
+    free_lexer(&lexer);
+    free_src(&src);
     return 0;
 }

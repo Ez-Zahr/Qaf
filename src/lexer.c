@@ -14,10 +14,8 @@ int isaralpha(wchar_t c) {
 tok_type_t get_keyword_type(wchar_t* keyword) {
     if (!wcscmp(keyword, L"اطبع")) {
         return TOK_PRINT;
-    } else if (!wcscmp(keyword, L"صح")) {
-        return TOK_TRUE;
-    } else if (!wcscmp(keyword, L"خطأ")) {
-        return TOK_FALSE;
+    } else if (!wcscmp(keyword, L"صح") || !wcscmp(keyword, L"خطأ")) {
+        return TOK_BOOL;
     } else if (!wcscmp(keyword, L"أو")) {
         return TOK_OR;
     } else if (!wcscmp(keyword, L"و")) {
@@ -62,6 +60,21 @@ tok_type_t get_op_type(wchar_t* op) {
     } else {
         wprintf(L"Error: Undefined operator `%ls`\n", op);
         exit(1);
+    }
+}
+
+int issymbol(wchar_t c) {
+    switch (c) {
+        case L'؛': case L'(': case L')': return 1; default: return 0;
+    }
+}
+
+tok_type_t get_symbol_type(wchar_t c) {
+    switch (c) {
+        case L'؛': return TOK_SEMI;
+        case L'(': return TOK_LPAREN;
+        case L')': return TOK_RPAREN;
+        default: return -1;
     }
 }
 
@@ -123,12 +136,12 @@ void lex(src_t* src, lexer_t* lexer) {
             tok->data[tok->len] = L'\0';
             tok->type = get_op_type(tok->data);
 
-        } else if (src->buf[src->pos] == L'؛') {
+        } else if (issymbol(src->buf[src->pos])) {
             token_t* tok = &lexer->tokens[lexer->size++];
-            tok->type = TOK_SEMI;
+            tok->type = get_symbol_type(src->buf[src->pos]);
             tok->len = 1;
             tok->data = (wchar_t*) calloc(2, sizeof(wchar_t));
-            tok->data[0] = L'؛';
+            tok->data[0] = src->buf[src->pos];
             tok->data[1] = L'\0';
             src->pos++;
 
@@ -153,54 +166,31 @@ void lex(src_t* src, lexer_t* lexer) {
 
 wchar_t* tok_type_to_str(tok_type_t type) {
     switch (type) {
-        case TOK_ID:
-            return L"TOK_ID";
-        case TOK_PRINT:
-            return L"TOK_PRINT";
-        case TOK_INT:
-            return L"TOK_INT";
-        case TOK_FLOAT:
-            return L"TOK_FLOAT";
-        case TOK_TRUE:
-            return L"TOK_TRUE";
-        case TOK_FALSE:
-            return L"TOK_FALSE";
-        case TOK_ASSIGN:
-            return L"TOK_ASSIGN";
-        case TOK_PLUS:
-            return L"TOK_PLUS";
-        case TOK_MINUS:
-            return L"TOK_MINUS";
-        case TOK_MUL:
-            return L"TOK_MUL";
-        case TOK_DIV:
-            return L"TOK_DIV";
-        case TOK_MOD:
-            return L"TOK_MOD";
-        case TOK_EQ:
-            return L"TOK_EQ";
-        case TOK_NE:
-            return L"TOK_NE";
-        case TOK_LT:
-            return L"TOK_LT";
-        case TOK_LTE:
-            return L"TOK_LTE";
-        case TOK_GT:
-            return L"TOK_GT";
-        case TOK_GTE:
-            return L"TOK_GTE";
-        case TOK_OR:
-            return L"TOK_OR";
-        case TOK_AND:
-            return L"TOK_AND";
-        case TOK_NOT:
-            return L"TOK_NOT";
-        case TOK_SEMI:
-            return L"TOK_SEMI";
-        case TOK_EOF:
-            return L"TOK_EOF";
-        default:
-            return L"Undefined type string";
+        case TOK_ID: return L"TOK_ID";
+        case TOK_PRINT: return L"TOK_PRINT";
+        case TOK_INT: return L"TOK_INT";
+        case TOK_FLOAT: return L"TOK_FLOAT";
+        case TOK_BOOL: return L"TOK_BOOL";
+        case TOK_ASSIGN: return L"TOK_ASSIGN";
+        case TOK_PLUS: return L"TOK_PLUS";
+        case TOK_MINUS: return L"TOK_MINUS";
+        case TOK_MUL: return L"TOK_MUL";
+        case TOK_DIV: return L"TOK_DIV";
+        case TOK_MOD: return L"TOK_MOD";
+        case TOK_EQ: return L"TOK_EQ";
+        case TOK_NE: return L"TOK_NE";
+        case TOK_LT: return L"TOK_LT";
+        case TOK_LTE: return L"TOK_LTE";
+        case TOK_GT: return L"TOK_GT";
+        case TOK_GTE: return L"TOK_GTE";
+        case TOK_OR: return L"TOK_OR";
+        case TOK_AND: return L"TOK_AND";
+        case TOK_NOT: return L"TOK_NOT";
+        case TOK_LPAREN: return L"TOK_LPAREN";
+        case TOK_RPAREN: return L"TOK_RPAREN";
+        case TOK_SEMI: return L"TOK_SEMI";
+        case TOK_EOF: return L"TOK_EOF";
+        default: return L"Undefined type string";
     }
 }
 

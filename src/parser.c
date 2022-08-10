@@ -41,8 +41,7 @@ node_t* _parse(lexer_t* lexer, int prior);
 
 node_t* parse_primary_expr(lexer_t* lexer) {
     switch (lexer->tokens[lexer->pos].type) {
-        case TOK_TRUE:
-        case TOK_FALSE:
+        case TOK_BOOL:
         case TOK_FLOAT:
         case TOK_INT:
         case TOK_ID: {
@@ -58,6 +57,17 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             return expr;
         }
 
+        case TOK_LPAREN: {
+            lexer->pos++;
+            node_t* expr = _parse(lexer, 1);
+            if (lexer->tokens[lexer->pos].type != TOK_RPAREN) {
+                wprintf(L"Error: Missing closing parenthesis\n");
+                exit(1);
+            }
+            lexer->pos++;
+            return expr;
+        }
+
         case TOK_PRINT: {
             node_t* expr = (node_t*) calloc(1, sizeof(node_t));
             expr->tok = &lexer->tokens[lexer->pos++];
@@ -67,7 +77,7 @@ node_t* parse_primary_expr(lexer_t* lexer) {
 
         default: {
             token_t tok = lexer->tokens[lexer->pos];
-            wprintf(L"Error: Invalid token `%ls` of type `%d`\n", tok.data, tok_type_to_str(tok.type));
+            wprintf(L"Error: Invalid token `%ls` of type `%ls`\n", tok.data, tok_type_to_str(tok.type));
             exit(1);
         }
     }
@@ -105,7 +115,7 @@ void parse(lexer_t* lexer, parser_t* parser) {
     }
 }
 
-void print_tree(node_t* node, int indent) {
+void _print_ast(node_t* node, int indent) {
     if (node == NULL) {
         return;
     }
@@ -116,29 +126,29 @@ void print_tree(node_t* node, int indent) {
     }
     
     wprintf(L"`%ls`\n", node->tok->data);
-    print_tree(node->left, indent + 1);
-    print_tree(node->right, indent + 1);
+    _print_ast(node->left, indent + 1);
+    _print_ast(node->right, indent + 1);
 }
 
 void print_parser(parser_t* parser) {
     for (int i = 0; i < parser->size; i++) {
-        print_tree(parser->astList[i], 0);
+        _print_ast(parser->astList[i], 0);
     }
 }
 
-void free_parse_tree(node_t* node) {
+void _free_ast(node_t* node) {
     if (node == NULL) {
         return;
     }
 
-    free_parse_tree(node->left);
-    free_parse_tree(node->right);
+    _free_ast(node->left);
+    _free_ast(node->right);
     free(node);
 }
 
 void free_parser(parser_t* parser) {
     for (int i = 0; i < parser->size; i++) {
-        free_parse_tree(parser->astList[i]);
+        _free_ast(parser->astList[i]);
     }
     free(parser->astList);
 }

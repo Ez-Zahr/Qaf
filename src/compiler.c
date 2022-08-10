@@ -37,7 +37,7 @@ void init_context(context_t* context) {
 }
 
 void add_offset(context_t* context, wchar_t* id) {
-    context->offsets[context->size++].id = id;
+    context->offsets[context->size].id = id;
     context->offsets[context->size++].type = -1;
     if (context->size >= context->cap) {
         context->cap *= 2;
@@ -67,8 +67,7 @@ int tok_to_bind_type(tok_type_t type) {
         case TOK_DIV:
         case TOK_MOD:
             return BIND_INT;
-        case TOK_TRUE:
-        case TOK_FALSE:
+        case TOK_BOOL:
         case TOK_AND:
         case TOK_OR:
         case TOK_NOT:
@@ -111,61 +110,59 @@ char* _compile(node_t* ast, context_t* context) {
         }
 
         case TOK_INT: {
-            char* expr = (char*) calloc(ast->tok->len + 2, sizeof(char));
-            strcat(expr, "$");
-            wcstombs(&expr[1], ast->tok->data, ast->tok->len);
+            char buf[32];
+            wcstombs(buf, ast->tok->data, 32);
+            char* expr = (char*) calloc(strlen(buf) + 12, sizeof(char));
+            sprintf(expr, "\tpushq $%s\n", buf);
             return expr;
         }
 
-        case TOK_TRUE: {
-            char* expr = (char*) calloc(3, sizeof(char));
-            strcpy(expr, "$1");
-            return expr;
-        }
-
-        case TOK_FALSE: {
-            char* expr = (char*) calloc(3, sizeof(char));
-            strcpy(expr, "$0");
+        case TOK_BOOL: {
+            char* expr = (char*) calloc(12, sizeof(char));
+            sprintf(expr, "\tpushq $%d\n", !wcscmp(ast->tok->data, L"صح"));
             return expr;
         }
 
         case TOK_ASSIGN: {
             char* left = _compile(ast->left, context);
             char* right = _compile(ast->right, context);
-            char* instr = (char*) calloc(strlen(left) + strlen(right) + 20, sizeof(char));
-            set_bind_type(context, atoi(left), tok_to_bind_type(ast->right->tok->type));
-            sprintf(instr, "%s\tmovq %%rax, -%s(%%rbp)\n", right, left);
+            char* instr = (char*) calloc(strlen(left) + strlen(right) + 26, sizeof(char));
+            // sprintf(instr, "%s\tmovq %%rax, -%s(%%rbp)\n", right, left);
+            strcat(instr, right);
+            strcat(instr, "\tpopq %rax\n\tmovq %rax, ");
+            strcat(instr, left);
+            strcat(instr, "\n");
             free(left);
             free(right);
             return instr;
         }
 
         case TOK_PLUS: {
-            return _compile_instr(ast, context, "\tmovq %s, %%rax\n\taddq %s, %%rax\n");
+            return _compile_instr(ast, context, "\tpopq %rbx\n\tpopq %rax\n\taddq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_MINUS: {
-            return _compile_instr(ast, context, "\tmovq %s, %%rax\n\tsubq %s, %%rax\n");
+            return _compile_instr(ast, context, "\tpopq %rbx\n\tpopq %rax\n\tsubq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_MUL: {
-            return _compile_instr(ast, context, "\tmovq %s, %%rax\n\timulq %s, %%rax\n");
+            return _compile_instr(ast, context, "\tpopq %rbx\n\tpopq %rax\n\timulq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_DIV: {
-            return _compile_instr(ast, context, "\tmovq %s, %%rax\n\tmovq %s, %%rbx\n\tmovq $0, %%rdx\n\tidivq %%rbx\n");
+            return _compile_instr(ast, context, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rax\n");
         }
 
         case TOK_MOD: {
-            return _compile_instr(ast, context, "\tmovq %s, %%rax\n\tmovq %s, %%rbx\n\tmovq $0, %%rdx\n\tidivq %%rbx\n\tmovq %%rdx, %%rax\n");
+            return _compile_instr(ast, context, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rbx\n");
         }
 
         case TOK_AND: {
-            return _compile_instr(ast, context, "\tmovq %s, %%rax\n\tandq %s, %%rax\n");
+            return _compile_instr(ast, context, "\tpopq %rbx\n\tpopq %rax\n\tandq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_OR: {
-            return _compile_instr(ast, context, "\tmovq %s, %%rax\n\torq %s, %%rax\n");
+            return _compile_instr(ast, context, "\tpopq %rbx\n\tpopq %rax\n\torq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_NOT: {
@@ -201,7 +198,7 @@ char* _compile(node_t* ast, context_t* context) {
         }
 
         default: {
-            wprintf(L"Error: Undefined compilation for `%s`\n", tok_type_to_str(ast->tok->type));
+            wprintf(L"Error: Undefined compilation for `%ls`\n", tok_type_to_str(ast->tok->type));
             exit(1);
         }
     }
@@ -211,23 +208,13 @@ char* _compile_instr(node_t* ast, context_t* context, char* format) {
     char* left = _compile(ast->left, context);
     char* right = _compile(ast->right, context);
     char* instr = (char*) calloc(strlen(left) + strlen(right) + strlen(format) + 1, sizeof(char));
-    sprintf(instr, format, left, right);
+    // sprintf(instr, format, left, right);
+    strcat(instr, left);
+    strcat(instr, right);
+    strcat(instr, format);
     free(left);
     free(right);
     return instr;
-}
-
-void write_asm(char* filename, sections_t* sections) {
-    FILE* output;
-
-    if ((output = fopen(filename, "w")) == NULL) {
-        wprintf(L"Could not open file %s\n", filename);
-        exit(1);
-    }
-
-    fputs(sections->rodata, output);
-    fputs(sections->text, output);
-    fclose(output);
 }
 
 void compile(parser_t* parser) {
@@ -244,13 +231,18 @@ void compile(parser_t* parser) {
     }
     
     init_prologue(&sections, &context);
-
     sections.text = (char*) realloc(sections.text, (strlen(sections.text) + strlen(buf) + 1) * sizeof(char));
     strcat(sections.text, buf);
-    
     init_epilogue(&sections, &context);
 
-    write_asm("./a.s", &sections);
+    FILE* output;
+    if ((output = fopen("./a.s", "w")) == NULL) {
+        wprintf(L"Could not open file ./a.s\n");
+        exit(1);
+    }
+    fputs(sections.rodata, output);
+    fputs(sections.text, output);
+    fclose(output);
     
     system("as a.s -o a.o");
     system("ld a.o -o a.out");
