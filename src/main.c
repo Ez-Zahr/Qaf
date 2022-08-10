@@ -10,13 +10,15 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    int _t = 0, _a = 0;
+    int _t = 0, _a = 0, _s = 0;
     char* filename = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-t")) {
             _t = 1;
         } else if (!strcmp(argv[i], "-a")) {
             _a = 1;
+        } else if (!strcmp(argv[i], "-s")) {
+            _s = 1;
         } else if (endsWith(argv[i], ".qaf") && !filename) {
             filename = argv[i];
         } else {
@@ -48,7 +50,7 @@ int main(int argc, char* argv[]) {
         print_parser(&parser);
     }
 
-    compile(&parser);
+    compile(&parser, _s);
     // transpile(&parser);
 
     free_parser(&parser);

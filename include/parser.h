@@ -5,8 +5,8 @@
 
 typedef enum {
     PRI_ASSIGN,
-    PRI_CMP,
     PRI_AND_OR,
+    PRI_CMP,
     PRI_ADD_SUB,
     PRI_MUL_DIV,
     PRI_MAX

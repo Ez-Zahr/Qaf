@@ -4,14 +4,21 @@
 #include "parser.h"
 
 typedef enum {
+    INS_CONST,
+    INS_OFFSET,
+    INS_COMP,
+    INS_CALL
+} instr_type_t;
+
+typedef enum {
     BIND_INT,
     BIND_BOOL
 } bind_type_t;
 
-typedef enum {
-    INS_OFFSET,
-    INS_COMP
-} instr_type_t;
+typedef struct {
+    char* data;
+    instr_type_t type;
+} instr_t;
 
 typedef struct {
     wchar_t* id;
@@ -29,11 +36,6 @@ typedef struct {
     char* text;
 } sections_t;
 
-typedef struct {
-    char* instr;
-    instr_type_t type;
-} instr_t;
-
-void compile(parser_t* parser);
+void compile(parser_t* parser, int _s);
 
 #endif
