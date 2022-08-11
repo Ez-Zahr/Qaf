@@ -57,7 +57,8 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             return expr;
         }
 
-        case TOK_IF: {
+        case TOK_IF: 
+        case TOK_WHILE: {
             node_t* expr = (node_t*) calloc(1, sizeof(node_t));
             expr->tok = &lexer->tokens[lexer->pos++];
             expr->left = parse_primary_expr(lexer);

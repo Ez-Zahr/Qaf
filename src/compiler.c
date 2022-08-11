@@ -58,14 +58,11 @@ int get_offset(context_t* context, wchar_t* id) {
     return 0;
 }
 
-char* get_label(context_t* context) {
-    char* label = (char*) calloc(8, sizeof(char));
-    sprintf(label, ".L%d", context->labels++);
-    return label;
-}
-
-void set_bind_type(context_t* context, int offset, bind_type_t type) {
-    context->offsets[offset / 8 - 1].type = type;
+int extract_offset(char* offset) {
+    int len = strchr(offset, '(') - offset;
+    char sub[len];
+    strncpy(sub, &offset[1], len - 1);
+    return atoi(sub);
 }
 
 int tok_to_bind_type(tok_type_t type) {
@@ -93,6 +90,12 @@ int tok_to_bind_type(tok_type_t type) {
     }
 }
 
+char* get_label(context_t* context) {
+    char* label = (char*) calloc(8, sizeof(char));
+    sprintf(label, ".L%d", context->labels++);
+    return label;
+}
+
 void free_context(context_t* context) {
     free(context->offsets);
 }
@@ -102,9 +105,14 @@ void free_instr(instr_t* instr) {
     free(instr);
 }
 
-instr_t* _process_offset(instr_t* instr) {
+instr_t* _process_offset(context_t* context, instr_t* instr) {
     switch (instr->type) {
         case INS_OFFSET: {
+            id_t id = context->offsets[extract_offset(instr->data) / 8 - 1];
+            if (id.type == -1) {
+                wprintf(L"Error: Undefined variable `%ls`\n", id.id);
+                exit(1);
+            }
             instr_t* new_instr = (instr_t*) calloc(1, sizeof(instr_t));
             new_instr->type = -1;
             new_instr->data = (char*) calloc(strlen(instr->data) + 12, sizeof(char));
@@ -159,7 +167,8 @@ instr_t* _compile(node_t* ast, context_t* context) {
 
         case TOK_ASSIGN: {
             instr_t* left = _compile(ast->left, context);
-            instr_t* right = _process_offset(_compile(ast->right, context));
+            instr_t* right = _process_offset(context, _compile(ast->right, context));
+            context->offsets[extract_offset(left->data) / 8 - 1].type = tok_to_bind_type(ast->right->tok->type);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
             instr->data = (char*) calloc(strlen(left->data) + strlen(right->data) + 32, sizeof(char));
@@ -198,7 +207,7 @@ instr_t* _compile(node_t* ast, context_t* context) {
         }
 
         case TOK_NOT: {
-            return _compile_unary_instr(ast, context, -1, "\tpopq %rax\n\tnegq %rax\n\tpushq %rax\n");
+            return _compile_unary_instr(ast, context, -1, "\tpopq %rax\n\tcmpq $0, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_EQ: {
@@ -226,7 +235,7 @@ instr_t* _compile(node_t* ast, context_t* context) {
         }
 
         case TOK_IF: {
-            instr_t* left = _process_offset(_compile(ast->left, context));
+            instr_t* left = _process_offset(context, _compile(ast->left, context));
             char* buf = (char*) calloc(1, sizeof(char));
             for (int i = 0; i < ast->right->size; i++) {
                 instr_t* ins = _compile(ast->right->astList[i], context);
@@ -249,6 +258,32 @@ instr_t* _compile(node_t* ast, context_t* context) {
             return instr;
         }
 
+        case TOK_WHILE: {
+            instr_t* left = _process_offset(context, _compile(ast->left, context));
+            char* buf = (char*) calloc(1, sizeof(char));
+            for (int i = 0; i < ast->right->size; i++) {
+                instr_t* ins = _compile(ast->right->astList[i], context);
+                buf = (char*) realloc(buf, (strlen(buf) + strlen(ins->data) + 1) * sizeof(char));
+                strcat(buf, ins->data);
+                free_instr(ins);
+            }
+
+            instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
+            instr->type = -1;
+
+            char* format = "%s:\n%s\tpopq %%rax\n\tcmpq $1, %%rax\n\tjne %s\n%s\tjmp %s\n%s:\n";
+            char* l1 = get_label(context);
+            char* l2 = get_label(context);
+            instr->data = (char*) calloc(strlen(left->data) + strlen(buf) + strlen(l1) * 2 + strlen(l2) * 2 + strlen(format) + 1, sizeof(char));
+            sprintf(instr->data, format, l1, left->data, l2, buf, l1, l2);
+
+            free_instr(left);
+            free(buf);
+            free(l1);
+            free(l2);
+            return instr;
+        }
+
         default: {
             wprintf(L"Error: Undefined compilation for `%ls`\n", tok_type_to_str(ast->tok->type));
             exit(1);
@@ -257,8 +292,8 @@ instr_t* _compile(node_t* ast, context_t* context) {
 }
 
 instr_t* _compile_binary_instr(node_t* ast, context_t* context, instr_type_t type, char* op) {
-    instr_t* left = _process_offset(_compile(ast->left, context));
-    instr_t* right = _process_offset(_compile(ast->right, context));
+    instr_t* left = _process_offset(context, _compile(ast->left, context));
+    instr_t* right = _process_offset(context, _compile(ast->right, context));
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
     instr->data = (char*) calloc(strlen(left->data) + strlen(right->data) + strlen(op) + 1, sizeof(char));
@@ -271,7 +306,7 @@ instr_t* _compile_binary_instr(node_t* ast, context_t* context, instr_type_t typ
 }
 
 instr_t* _compile_unary_instr(node_t* ast, context_t* context, instr_type_t type, char* op) {
-    instr_t* left = _process_offset(_compile(ast->left, context));
+    instr_t* left = _process_offset(context, _compile(ast->left, context));
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
     instr->data = (char*) calloc(strlen(left->data) + strlen(op) + 1, sizeof(char));
