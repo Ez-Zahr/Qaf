@@ -51,7 +51,6 @@ int main(int argc, char* argv[]) {
     }
 
     compile(&parser, _s);
-    // transpile(&parser);
 
     free_parser(&parser);
     free_lexer(&lexer);

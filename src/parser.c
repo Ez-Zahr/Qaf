@@ -57,6 +57,14 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             return expr;
         }
 
+        case TOK_IF: {
+            node_t* expr = (node_t*) calloc(1, sizeof(node_t));
+            expr->tok = &lexer->tokens[lexer->pos++];
+            expr->left = parse_primary_expr(lexer);
+            expr->right = parse_primary_expr(lexer);
+            return expr;
+        }
+
         case TOK_LPAREN: {
             lexer->pos++;
             node_t* expr = _parse(lexer, 1);
@@ -67,6 +75,32 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             lexer->pos++;
             return expr;
         }
+
+        case TOK_LBRACE: {
+            node_t* exprList = (node_t*) calloc(1, sizeof(node_t));
+            exprList->tok = &lexer->tokens[lexer->pos++];
+            exprList->cap = 32;
+            exprList->size = 0;
+            exprList->astList = (node_t**) calloc(exprList->cap, sizeof(node_t*));
+            while (lexer->tokens[lexer->pos].type != TOK_RBRACE) {
+                if (lexer->tokens[lexer->pos].type == TOK_SEMI) {
+                    lexer->pos++;
+                    continue;
+                } else if (lexer->tokens[lexer->pos].type == TOK_EOF) {
+                    wprintf(L"Error: Missing closing brace\n");
+                    exit(1);
+                }
+                exprList->astList[exprList->size++] = _parse(lexer, 0);
+                if (exprList->size >= exprList->cap) {
+                    exprList->cap *= 2;
+                    exprList->astList = (node_t**) realloc(exprList->astList, exprList->cap * sizeof(node_t*));
+                }
+            }
+            lexer->pos++;
+            return exprList;
+        }
+
+        case TOK_LBRACK: {}
 
         case TOK_PRINT: {
             node_t* expr = (node_t*) calloc(1, sizeof(node_t));
@@ -124,8 +158,19 @@ void _print_ast(node_t* node, int indent) {
     for (int i = 0; i < indent; i++) {
         wprintf(L" ");
     }
-    
     wprintf(L"`%ls`\n", node->tok->data);
+
+    if (node->tok->type == TOK_LBRACE) {
+        for (int i = 0; i < node->size; i++) {
+            _print_ast(node->astList[i], indent + 1);
+        }
+        wprintf(L"%d: ", indent);
+        for (int i = 0; i < indent; i++) {
+            wprintf(L" ");
+        }
+        wprintf(L"`}`\n");
+    }
+    
     _print_ast(node->left, indent + 1);
     _print_ast(node->right, indent + 1);
 }

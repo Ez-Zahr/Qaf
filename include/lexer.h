@@ -29,8 +29,16 @@ typedef enum {
     TOK_GT,
     TOK_GTE,
 
+    TOK_IF,
+    TOK_FOR,
+    TOK_WHILE,
+
     TOK_LPAREN,
     TOK_RPAREN,
+    TOK_LBRACE,
+    TOK_RBRACE,
+    TOK_LBRACK,
+    TOK_RBRACK,
     TOK_SEMI,
     TOK_EOF
 } tok_type_t;

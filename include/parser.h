@@ -16,6 +16,9 @@ typedef struct node_t {
     token_t* tok;
     struct node_t* left;
     struct node_t* right;
+    struct node_t** astList;
+    int cap;
+    int size;
 } node_t;
 
 typedef struct {

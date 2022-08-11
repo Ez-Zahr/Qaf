@@ -4,10 +4,7 @@
 #include "parser.h"
 
 typedef enum {
-    INS_CONST,
-    INS_OFFSET,
-    INS_COMP,
-    INS_CALL
+    INS_OFFSET
 } instr_type_t;
 
 typedef enum {
@@ -29,11 +26,13 @@ typedef struct {
     id_t* offsets;
     int cap;
     int size;
+    int labels;
 } context_t;
 
 typedef struct {
     char* rodata;
     char* text;
+    int labels;
 } sections_t;
 
 void compile(parser_t* parser, int _s);

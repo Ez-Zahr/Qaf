@@ -22,6 +22,12 @@ tok_type_t get_keyword_type(wchar_t* keyword) {
         return TOK_AND;
     } else if (!wcscmp(keyword, L"ليس")) {
         return TOK_NOT;
+    } else if (!wcscmp(keyword, L"إذا")) {
+        return TOK_IF;
+    } else if (!wcscmp(keyword, L"لكل")) {
+        return TOK_FOR;
+    } else if (!wcscmp(keyword, L"طالما")) {
+        return TOK_WHILE;
     }
     return TOK_ID;
 }
@@ -65,7 +71,7 @@ tok_type_t get_op_type(wchar_t* op) {
 
 int issymbol(wchar_t c) {
     switch (c) {
-        case L'؛': case L'(': case L')': return 1; default: return 0;
+        case L'؛': case L'(': case L')': case L'{': case L'}': case L'[': case L']': return 1; default: return 0;
     }
 }
 
@@ -74,6 +80,10 @@ tok_type_t get_symbol_type(wchar_t c) {
         case L'؛': return TOK_SEMI;
         case L'(': return TOK_LPAREN;
         case L')': return TOK_RPAREN;
+        case L'{': return TOK_LBRACE;
+        case L'}': return TOK_RBRACE;
+        case L'[': return TOK_LBRACK;
+        case L']': return TOK_RBRACK;
         default: return -1;
     }
 }
@@ -177,17 +187,24 @@ wchar_t* tok_type_to_str(tok_type_t type) {
         case TOK_MUL: return L"TOK_MUL";
         case TOK_DIV: return L"TOK_DIV";
         case TOK_MOD: return L"TOK_MOD";
+        case TOK_AND: return L"TOK_AND";
+        case TOK_OR: return L"TOK_OR";
+        case TOK_NOT: return L"TOK_NOT";
         case TOK_EQ: return L"TOK_EQ";
         case TOK_NE: return L"TOK_NE";
         case TOK_LT: return L"TOK_LT";
         case TOK_LTE: return L"TOK_LTE";
         case TOK_GT: return L"TOK_GT";
         case TOK_GTE: return L"TOK_GTE";
-        case TOK_OR: return L"TOK_OR";
-        case TOK_AND: return L"TOK_AND";
-        case TOK_NOT: return L"TOK_NOT";
+        case TOK_IF: return L"TOK_IF";
+        case TOK_FOR: return L"TOK_FOR";
+        case TOK_WHILE: return L"TOK_WHILE";
         case TOK_LPAREN: return L"TOK_LPAREN";
         case TOK_RPAREN: return L"TOK_RPAREN";
+        case TOK_LBRACE: return L"TOK_LBRACE";
+        case TOK_RBRACE: return L"TOK_RBRACE";
+        case TOK_LBRACK: return L"TOK_LBRACK";
+        case TOK_RBRACK: return L"TOK_RBRACK";
         case TOK_SEMI: return L"TOK_SEMI";
         case TOK_EOF: return L"TOK_EOF";
         default: return L"Undefined type string";
