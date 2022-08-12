@@ -32,6 +32,7 @@ typedef enum {
     TOK_IF,
     TOK_FOR,
     TOK_WHILE,
+    TOK_IN,
 
     TOK_LPAREN,
     TOK_RPAREN,
@@ -39,6 +40,7 @@ typedef enum {
     TOK_RBRACE,
     TOK_LBRACK,
     TOK_RBRACK,
+    TOK_COLON,
     TOK_SEMI,
     TOK_EOF
 } tok_type_t;

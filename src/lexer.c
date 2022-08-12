@@ -28,6 +28,8 @@ tok_type_t get_keyword_type(wchar_t* keyword) {
         return TOK_FOR;
     } else if (!wcscmp(keyword, L"طالما")) {
         return TOK_WHILE;
+    } else if (!wcscmp(keyword, L"في")) {
+        return TOK_IN;
     }
     return TOK_ID;
 }
@@ -71,7 +73,7 @@ tok_type_t get_op_type(wchar_t* op) {
 
 int issymbol(wchar_t c) {
     switch (c) {
-        case L'؛': case L'(': case L')': case L'{': case L'}': case L'[': case L']': return 1; default: return 0;
+        case L'؛': case L'(': case L')': case L'{': case L'}': case L'[': case L']': case L':': return 1; default: return 0;
     }
 }
 
@@ -84,6 +86,7 @@ tok_type_t get_symbol_type(wchar_t c) {
         case L'}': return TOK_RBRACE;
         case L'[': return TOK_LBRACK;
         case L']': return TOK_RBRACK;
+        case L':': return TOK_COLON;
         default: return -1;
     }
 }
@@ -199,12 +202,14 @@ wchar_t* tok_type_to_str(tok_type_t type) {
         case TOK_IF: return L"TOK_IF";
         case TOK_FOR: return L"TOK_FOR";
         case TOK_WHILE: return L"TOK_WHILE";
+        case TOK_IN: return L"TOK_IN";
         case TOK_LPAREN: return L"TOK_LPAREN";
         case TOK_RPAREN: return L"TOK_RPAREN";
         case TOK_LBRACE: return L"TOK_LBRACE";
         case TOK_RBRACE: return L"TOK_RBRACE";
         case TOK_LBRACK: return L"TOK_LBRACK";
         case TOK_RBRACK: return L"TOK_RBRACK";
+        case TOK_COLON: return L"TOK_COLON";
         case TOK_SEMI: return L"TOK_SEMI";
         case TOK_EOF: return L"TOK_EOF";
         default: return L"Undefined type string";

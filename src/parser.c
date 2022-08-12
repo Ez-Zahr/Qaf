@@ -50,6 +50,7 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             return prim_node;
         }
 
+        case TOK_MINUS:
         case TOK_NOT: {
             node_t* expr = (node_t*) calloc(1, sizeof(node_t));
             expr->tok = &lexer->tokens[lexer->pos++];
@@ -63,6 +64,18 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             expr->tok = &lexer->tokens[lexer->pos++];
             expr->left = parse_primary_expr(lexer);
             expr->right = parse_primary_expr(lexer);
+            return expr;
+        }
+
+        case TOK_FOR: {
+            token_t* tok = &lexer->tokens[lexer->pos++];
+            node_t* left = parse_primary_expr(lexer);
+            lexer->pos++;
+            node_t* right = parse_primary_expr(lexer);
+            node_t* expr = parse_primary_expr(lexer);
+            expr->tok = tok;
+            expr->left = left;
+            expr->right = right;
             return expr;
         }
 
@@ -101,7 +114,32 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             return exprList;
         }
 
-        case TOK_LBRACK: {}
+        case TOK_LBRACK: {
+            node_t* exprList = (node_t*) calloc(1, sizeof(node_t));
+            exprList->tok = &lexer->tokens[lexer->pos++];
+            exprList->cap = 8;
+            exprList->size = 0;
+            exprList->astList = (node_t**) calloc(exprList->cap, sizeof(node_t*));
+            while (lexer->tokens[lexer->pos].type != TOK_RBRACK) {
+                if (lexer->tokens[lexer->pos].type == TOK_COLON) {
+                    lexer->pos++;
+                    continue;
+                } else if (lexer->tokens[lexer->pos].type == TOK_SEMI) {
+                    wprintf(L"Error: Invalid semicolon\n");
+                    exit(1);
+                } else if (lexer->tokens[lexer->pos].type == TOK_EOF) {
+                    wprintf(L"Error: Missing closing bracket\n");
+                    exit(1);
+                }
+                exprList->astList[exprList->size++] = parse_primary_expr(lexer);
+                if (exprList->size >= exprList->cap) {
+                    exprList->cap *= 2;
+                    exprList->astList = (node_t**) realloc(exprList->astList, exprList->cap * sizeof(node_t*));
+                }
+            }
+            lexer->pos++;
+            return exprList;
+        }
 
         case TOK_PRINT: {
             node_t* expr = (node_t*) calloc(1, sizeof(node_t));
@@ -160,20 +198,15 @@ void _print_ast(node_t* node, int indent) {
         wprintf(L" ");
     }
     wprintf(L"`%ls`\n", node->tok->data);
-
-    if (node->tok->type == TOK_LBRACE) {
-        for (int i = 0; i < node->size; i++) {
-            _print_ast(node->astList[i], indent + 1);
-        }
-        wprintf(L"%d: ", indent);
-        for (int i = 0; i < indent; i++) {
-            wprintf(L" ");
-        }
-        wprintf(L"`}`\n");
-    }
     
     _print_ast(node->left, indent + 1);
     _print_ast(node->right, indent + 1);
+
+    if (node->cap > 0) {
+        for (int i = 0; i < node->size; i++) {
+            _print_ast(node->astList[i], indent + 1);
+        }
+    }
 }
 
 void print_parser(parser_t* parser) {

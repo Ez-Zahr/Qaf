@@ -125,6 +125,13 @@ instr_t* _process_offset(context_t* context, instr_t* instr) {
     }
 }
 
+char* wcstocs(wchar_t* str) {
+    int len = wcslen(str);
+    char* buf = (char*) calloc(len + 1, sizeof(char));
+    wcstombs(buf, str, len);
+    return buf;
+}
+
 instr_t* _compile_binary_instr(node_t* ast, context_t* context, instr_type_t type, char* op);
 instr_t* _compile_unary_instr(node_t* ast, context_t* context, instr_type_t type, char* op);
 
@@ -183,6 +190,15 @@ instr_t* _compile(node_t* ast, context_t* context) {
         }
 
         case TOK_MINUS: {
+            if (!ast->right) {
+                char buf[32];
+                wcstombs(buf, ast->left->tok->data, 32);
+                instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
+                instr->type = -1;
+                instr->data = (char*) calloc(strlen(buf) + 12, sizeof(char));
+                sprintf(instr->data, "\tpushq $-%s\n", buf);
+                return instr;
+            }
             return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tsubq %rbx, %rax\n\tpushq %rax\n");
         }
 
@@ -195,7 +211,7 @@ instr_t* _compile(node_t* ast, context_t* context) {
         }
 
         case TOK_MOD: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rbx\n");
+            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rdx\n");
         }
 
         case TOK_AND: {
@@ -284,6 +300,40 @@ instr_t* _compile(node_t* ast, context_t* context) {
             return instr;
         }
 
+        case TOK_FOR: {
+            instr_t* left = _compile(ast->left, context);
+            context->offsets[extract_offset(left->data) / 8 - 1].type = BIND_INT;
+            char* start = wcstocs(ast->right->astList[0]->tok->data);
+            char* end = wcstocs(ast->right->astList[1]->tok->data);
+            char* step = wcstocs(ast->right->astList[2]->tok->data);
+            char* buf = (char*) calloc(1, sizeof(char));
+            for (int i = 0; i < ast->size; i++) {
+                instr_t* ins = _compile(ast->astList[i], context);
+                buf = (char*) realloc(buf, (strlen(buf) + strlen(ins->data) + 1) * sizeof(char));
+                strcat(buf, ins->data);
+                free_instr(ins);
+            }
+
+            instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
+            instr->type = -1;
+
+            char* format = "\tmovq $%s, %s\n%s:\n\tcmpq $%s, %s\n\t%s %s\n%s\taddq $%s, %s\n\tjmp %s\n%s:\n";
+            char* cond = (step[0] == '-')? "jl" : "jg";
+            char* l1 = get_label(context);
+            char* l2 = get_label(context);
+            instr->data = (char*) calloc(strlen(left->data) * 3 + strlen(buf) + strlen(start) + strlen(end) + strlen(step) + strlen(l1) * 2 + strlen(l2) * 2 + strlen(format) + 3, sizeof(char));
+            sprintf(instr->data, format, start, left->data, l1, end, left->data, cond, l2, buf, step, left->data, l1, l2);
+
+            free_instr(left);
+            free(start);
+            free(end);
+            free(step);
+            free(buf);
+            free(l1);
+            free(l2);
+            return instr;
+        }
+
         default: {
             wprintf(L"Error: Undefined compilation for `%ls`\n", tok_type_to_str(ast->tok->type));
             exit(1);
@@ -344,10 +394,10 @@ void compile(parser_t* parser, int _s) {
     fputs(sections.text, output);
     fclose(output);
     
-    system("as a.s include/asm/* -o a.o");
-    system("ld a.o -o a.out");
-    system("rm a.o");
     if (!_s) {
+        system("as a.s include/asm/* -o a.o");
+        system("ld a.o -o a.out");
+        system("rm a.o");
         system("rm a.s");
     }
     

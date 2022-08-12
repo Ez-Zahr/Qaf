@@ -9,10 +9,10 @@ print:
     leaveq
     retq
 
-print_newline:
+print_char:
     pushq %rbp
     movq %rsp, %rbp
-    pushq $10
+    pushq %r8
     movq %rsp, %r8
     movq $1, %r9
     callq print
@@ -26,6 +26,13 @@ print_int:
     movq $10, -8(%rbp)
     movq $0, -16(%rbp)
     movq %r8, %rax
+    cmpq $0, %rax
+    jge _loop
+    negq %rax
+    pushq %rax
+    movq $45, %r8
+    callq print_char
+    popq %rax
 _loop:
     movq $0, %rdx
     idivq -8(%rbp)
@@ -42,7 +49,8 @@ _print:
     decq -16(%rbp)
     cmpq $0, -16(%rbp)
     jg _print
-    callq print_newline
+    movq $10, %r8
+    callq print_char
 _return:
     leaveq
     retq
