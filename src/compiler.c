@@ -34,19 +34,11 @@ void free_sections(sections_t* sections) {
 }
 
 void init_context(context_t* context) {
-    context->labels = 0;
     context->cap = 8;
     context->size = 0;
+    context->labels = 0;
+    context->strings = 0;
     context->offsets = (id_t*) calloc(context->cap, sizeof(id_t));
-}
-
-void add_offset(context_t* context, wchar_t* id) {
-    context->offsets[context->size].id = id;
-    context->offsets[context->size++].type = -1;
-    if (context->size >= context->cap) {
-        context->cap *= 2;
-        context->offsets = (id_t*) realloc(context->offsets, context->cap * sizeof(id_t));
-    }
 }
 
 int get_offset(context_t* context, wchar_t* id) {
@@ -55,17 +47,25 @@ int get_offset(context_t* context, wchar_t* id) {
             return (i + 1) * 8;
         }
     }
-    return 0;
+
+    context->offsets[context->size].id = id;
+    context->offsets[context->size++].type = -1;
+    if (context->size >= context->cap) {
+        context->cap *= 2;
+        context->offsets = (id_t*) realloc(context->offsets, context->cap * sizeof(id_t));
+    }
+    return context->size * 8;
 }
 
 int extract_offset(char* offset) {
     int len = strchr(offset, '(') - offset;
     char sub[len];
+    memset(sub, 0, len);
     strncpy(sub, &offset[1], len - 1);
     return atoi(sub);
 }
 
-int tok_to_bind_type(tok_type_t type) {
+bind_type_t tok_to_bind_type(tok_type_t type) {
     switch (type) {
         case TOK_INT:
         case TOK_PLUS:
@@ -85,6 +85,10 @@ int tok_to_bind_type(tok_type_t type) {
         case TOK_GT:
         case TOK_GTE:
             return BIND_BOOL;
+        case TOK_CHAR:
+            return BIND_CHAR;
+        case TOK_STR:
+            return BIND_STR;
         default:
             return -1;
     }
@@ -125,28 +129,32 @@ instr_t* _process_offset(context_t* context, instr_t* instr) {
     }
 }
 
-char* wcstocs(wchar_t* str) {
-    int len = wcslen(str);
-    char* buf = (char*) calloc(len + 1, sizeof(char));
-    wcstombs(buf, str, len);
-    return buf;
-}
+instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, char* op);
+instr_t* _compile_unary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, char* op);
 
-instr_t* _compile_binary_instr(node_t* ast, context_t* context, instr_type_t type, char* op);
-instr_t* _compile_unary_instr(node_t* ast, context_t* context, instr_type_t type, char* op);
-
-instr_t* _compile(node_t* ast, context_t* context) {
+instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
     switch (ast->tok->type) {
         case TOK_PRINT: {
-            return _compile_unary_instr(ast, context, -1, "\tpopq %r8\n\tcallq print_int\n");
+            char* op;
+            instr_t* left = _compile(ast->left, context, sections);
+            switch (context->offsets[extract_offset(left->data) / 8 - 1].type) {
+                case BIND_INT: op = "\tmovq %s, %%r8\n\tcallq print_int\n"; break;
+                case BIND_CHAR: op = "\tmovq %s, %%r8\n\tcallq print_char\n"; break;
+                case BIND_STR: op = "\tmovq %s, %%r8\n\tmovq $14, %%r9\n\tcallq print\n"; break;
+                default:
+                    wprintf(L"Error: Undefined variable `%ls`\n", ast->left->tok->data);
+                    exit(1);
+            }
+            instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
+            instr->type = -1;
+            instr->data = (char*) calloc(strlen(left->data) + strlen(op) + 1, sizeof(char));
+            sprintf(instr->data, op, left->data);
+            free_instr(left);
+            return instr;
         }
 
         case TOK_ID: {
-            int offset;
-            if (!(offset = get_offset(context, ast->tok->data))) {
-                add_offset(context, ast->tok->data);
-                offset = get_offset(context, ast->tok->data);
-            }
+            int offset = get_offset(context, ast->tok->data);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = INS_OFFSET;
             instr->data = (char*) calloc(16, sizeof(char));
@@ -172,89 +180,104 @@ instr_t* _compile(node_t* ast, context_t* context) {
             return instr;
         }
 
+        case TOK_CHAR: {
+            instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
+            instr->type = -1;
+            instr->data = (char*) calloc(16, sizeof(char));
+            sprintf(instr->data, "\tpushq $%d\n", wctob(ast->tok->data[0]));
+            return instr;
+        }
+
+        case TOK_STR: {
+            int strnum = context->strings++;
+            char buf[64];
+            sprintf(buf, "\tstr%d: .string \"Hello, world!\\n\"\n\t.equ len%d, .-str%d\n", strnum, strnum, strnum);
+            sections->rodata = (char*) realloc(sections->rodata, (strlen(sections->rodata) + strlen(buf) + 1) * sizeof(char));
+            strcat(sections->rodata, buf);
+            instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
+            instr->type = -1;
+            instr->data = (char*) calloc(20, sizeof(char));
+            sprintf(instr->data, "\tpushq $str%d\n", strnum);
+            return instr;
+        }
+
         case TOK_ASSIGN: {
-            instr_t* left = _compile(ast->left, context);
-            instr_t* right = _process_offset(context, _compile(ast->right, context));
+            instr_t* left = _compile(ast->left, context, sections);
+            instr_t* right = _process_offset(context, _compile(ast->right, context, sections));
             context->offsets[extract_offset(left->data) / 8 - 1].type = tok_to_bind_type(ast->right->tok->type);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
             instr->data = (char*) calloc(strlen(left->data) + strlen(right->data) + 32, sizeof(char));
-            sprintf(instr->data, "%s\tpopq %%rax\n\tmovq %%rax, %s\n", right->data, left->data);
+            sprintf(instr->data, "%s\tpopq %s\n", right->data, left->data);
             free_instr(left);
             free_instr(right);
             return instr;
         }
 
         case TOK_PLUS: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\taddq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\taddq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_MINUS: {
             if (!ast->right) {
-                char buf[32];
-                wcstombs(buf, ast->left->tok->data, 32);
-                instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
-                instr->type = -1;
-                instr->data = (char*) calloc(strlen(buf) + 12, sizeof(char));
-                sprintf(instr->data, "\tpushq $-%s\n", buf);
-                return instr;
+                return _compile_unary_instr(ast, context, sections, -1, "\tpopq %rax\n\tnegq %rax\n\tpushq %rax\n");
             }
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tsubq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tsubq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_MUL: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\timulq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\timulq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_DIV: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rax\n");
         }
 
         case TOK_MOD: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rdx\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rdx\n");
         }
 
         case TOK_AND: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tandq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tandq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_OR: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\torq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\torq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_NOT: {
-            return _compile_unary_instr(ast, context, -1, "\tpopq %rax\n\tcmpq $0, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_unary_instr(ast, context, sections, -1, "\tpopq %rax\n\tcmpq $0, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_EQ: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_NE: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetne %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetne %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_LT: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetl %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetl %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_LTE: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetle %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetle %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_GT: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetg %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetg %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_GTE: {
-            return _compile_binary_instr(ast, context, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetge %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetge %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_IF: {
-            instr_t* left = _process_offset(context, _compile(ast->left, context));
+            instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
             char* buf = (char*) calloc(1, sizeof(char));
             for (int i = 0; i < ast->right->size; i++) {
-                instr_t* ins = _compile(ast->right->astList[i], context);
+                instr_t* ins = _compile(ast->right->astList[i], context, sections);
                 buf = (char*) realloc(buf, (strlen(buf) + strlen(ins->data) + 1) * sizeof(char));
                 strcat(buf, ins->data);
                 free_instr(ins);
@@ -275,10 +298,10 @@ instr_t* _compile(node_t* ast, context_t* context) {
         }
 
         case TOK_WHILE: {
-            instr_t* left = _process_offset(context, _compile(ast->left, context));
+            instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
             char* buf = (char*) calloc(1, sizeof(char));
             for (int i = 0; i < ast->right->size; i++) {
-                instr_t* ins = _compile(ast->right->astList[i], context);
+                instr_t* ins = _compile(ast->right->astList[i], context, sections);
                 buf = (char*) realloc(buf, (strlen(buf) + strlen(ins->data) + 1) * sizeof(char));
                 strcat(buf, ins->data);
                 free_instr(ins);
@@ -301,14 +324,16 @@ instr_t* _compile(node_t* ast, context_t* context) {
         }
 
         case TOK_FOR: {
-            instr_t* left = _compile(ast->left, context);
+            instr_t* left = _compile(ast->left, context, sections);
             context->offsets[extract_offset(left->data) / 8 - 1].type = BIND_INT;
-            char* start = wcstocs(ast->right->astList[0]->tok->data);
-            char* end = wcstocs(ast->right->astList[1]->tok->data);
-            char* step = wcstocs(ast->right->astList[2]->tok->data);
+
+            instr_t* start = _compile(ast->right->astList[0], context, sections);
+            instr_t* end = _compile(ast->right->astList[1], context, sections);
+            instr_t* step = _compile(ast->right->astList[2], context, sections);
+
             char* buf = (char*) calloc(1, sizeof(char));
             for (int i = 0; i < ast->size; i++) {
-                instr_t* ins = _compile(ast->astList[i], context);
+                instr_t* ins = _compile(ast->astList[i], context, sections);
                 buf = (char*) realloc(buf, (strlen(buf) + strlen(ins->data) + 1) * sizeof(char));
                 strcat(buf, ins->data);
                 free_instr(ins);
@@ -317,17 +342,17 @@ instr_t* _compile(node_t* ast, context_t* context) {
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
 
-            char* format = "\tmovq $%s, %s\n%s:\n\tcmpq $%s, %s\n\t%s %s\n%s\taddq $%s, %s\n\tjmp %s\n%s:\n";
-            char* cond = (step[0] == '-')? "jl" : "jg";
+            char* format = "%s\tpopq %s\n%s:\n%s\tpopq %%rax\n\tcmpq %%rax, %s\n\t%s %s\n%s%s\tpopq %%rax\n\taddq %%rax, %s\n\tjmp %s\n%s:\n";
+            char* jmp = (ast->right->astList[2]->tok->type == TOK_MINUS)? "jl" : "jg";
             char* l1 = get_label(context);
             char* l2 = get_label(context);
-            instr->data = (char*) calloc(strlen(left->data) * 3 + strlen(buf) + strlen(start) + strlen(end) + strlen(step) + strlen(l1) * 2 + strlen(l2) * 2 + strlen(format) + 3, sizeof(char));
-            sprintf(instr->data, format, start, left->data, l1, end, left->data, cond, l2, buf, step, left->data, l1, l2);
+            instr->data = (char*) calloc(strlen(left->data) * 3 + strlen(buf) + strlen(start->data) + strlen(end->data) + strlen(step->data) + strlen(l1) * 2 + strlen(l2) * 2 + strlen(format) + 3, sizeof(char));
+            sprintf(instr->data, format, start->data, left->data, l1, end->data, left->data, jmp, l2, buf, step->data, left->data, l1, l2);
 
             free_instr(left);
-            free(start);
-            free(end);
-            free(step);
+            free_instr(start);
+            free_instr(end);
+            free_instr(step);
             free(buf);
             free(l1);
             free(l2);
@@ -341,9 +366,9 @@ instr_t* _compile(node_t* ast, context_t* context) {
     }
 }
 
-instr_t* _compile_binary_instr(node_t* ast, context_t* context, instr_type_t type, char* op) {
-    instr_t* left = _process_offset(context, _compile(ast->left, context));
-    instr_t* right = _process_offset(context, _compile(ast->right, context));
+instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, char* op) {
+    instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
+    instr_t* right = _process_offset(context, _compile(ast->right, context, sections));
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
     instr->data = (char*) calloc(strlen(left->data) + strlen(right->data) + strlen(op) + 1, sizeof(char));
@@ -355,8 +380,8 @@ instr_t* _compile_binary_instr(node_t* ast, context_t* context, instr_type_t typ
     return instr;
 }
 
-instr_t* _compile_unary_instr(node_t* ast, context_t* context, instr_type_t type, char* op) {
-    instr_t* left = _process_offset(context, _compile(ast->left, context));
+instr_t* _compile_unary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, char* op) {
+    instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
     instr->data = (char*) calloc(strlen(left->data) + strlen(op) + 1, sizeof(char));
@@ -374,7 +399,7 @@ void compile(parser_t* parser, int _s) {
 
     char* buf = (char*) calloc(1, sizeof(char));
     for (int i = 0; i < parser->size; i++) {
-        instr_t* instr = _compile(parser->astList[i], &context);
+        instr_t* instr = _compile(parser->astList[i], &context, &sections);
         buf = (char*) realloc(buf, (strlen(buf) + strlen(instr->data) + 1) * sizeof(char));
         strcat(buf, instr->data);
         free_instr(instr);
@@ -383,6 +408,7 @@ void compile(parser_t* parser, int _s) {
     init_prologue(&sections, &context);
     sections.text = (char*) realloc(sections.text, (strlen(sections.text) + strlen(buf) + 1) * sizeof(char));
     strcat(sections.text, buf);
+    free(buf);
     init_epilogue(&sections, &context);
 
     FILE* output;

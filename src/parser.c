@@ -44,6 +44,8 @@ node_t* parse_primary_expr(lexer_t* lexer) {
         case TOK_BOOL:
         case TOK_FLOAT:
         case TOK_INT:
+        case TOK_CHAR:
+        case TOK_STR:
         case TOK_ID: {
             node_t* prim_node = (node_t*) calloc(1, sizeof(node_t));
             prim_node->tok = &lexer->tokens[lexer->pos++];

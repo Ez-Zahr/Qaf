@@ -158,9 +158,50 @@ void lex(src_t* src, lexer_t* lexer) {
             tok->data[1] = L'\0';
             src->pos++;
 
+        } else if (src->buf[src->pos] == L'‘') {
+            token_t* tok = &lexer->tokens[lexer->size++];
+            tok->type = TOK_CHAR;
+            src->pos++;
+            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
+            tok->len = 0;
+            if (src->buf[src->pos] != L'’' && src->buf[src->pos] != L'\0') {
+                tok->data[tok->len++] = src->buf[src->pos++];
+                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
+            }
+            tok->data[tok->len] = L'\0';
+            if (src->buf[src->pos] != L'’') {
+                wprintf(L"Error: Invalid character format\n");
+                exit(1);
+            }
+            src->pos++;
+
+        } else if (src->buf[src->pos] == L'"') {
+            token_t* tok = &lexer->tokens[lexer->size++];
+            tok->type = TOK_STR;
+            src->pos++;
+            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
+            tok->len = 0;
+            while (src->buf[src->pos] != L'"' && src->buf[src->pos] != L'\0') {
+                tok->data[tok->len++] = src->buf[src->pos++];
+                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
+            }
+            tok->data[tok->len] = L'\0';
+            if (src->buf[src->pos] != L'"') {
+                wprintf(L"Error: Missing closing double quote\n");
+                exit(1);
+            }
+            src->pos++;
+
+        } else if (src->buf[src->pos] == L'#') {
+            while (src->buf[src->pos] != L'\n' && src->buf[src->pos] != L'\0') {
+                src->pos++;
+            }
+            continue;
+
         } else if (src->buf[src->pos] == L'\n') {
             line++;
             src->pos++;
+            continue;
 
         } else {
             wprintf(L"Error: Undefined symbol `%lc` at %d:%d\n", src->buf[src->pos], line, src->pos);
@@ -184,6 +225,8 @@ wchar_t* tok_type_to_str(tok_type_t type) {
         case TOK_INT: return L"TOK_INT";
         case TOK_FLOAT: return L"TOK_FLOAT";
         case TOK_BOOL: return L"TOK_BOOL";
+        case TOK_CHAR: return L"TOK_CHAR";
+        case TOK_STR: return L"TOK_STR";
         case TOK_ASSIGN: return L"TOK_ASSIGN";
         case TOK_PLUS: return L"TOK_PLUS";
         case TOK_MINUS: return L"TOK_MINUS";

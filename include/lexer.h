@@ -10,6 +10,8 @@ typedef enum {
     TOK_INT,
     TOK_FLOAT,
     TOK_BOOL,
+    TOK_CHAR,
+    TOK_STR,
     
     TOK_ASSIGN,
     TOK_PLUS,

@@ -9,7 +9,9 @@ typedef enum {
 
 typedef enum {
     BIND_INT,
-    BIND_BOOL
+    BIND_BOOL,
+    BIND_CHAR,
+    BIND_STR
 } bind_type_t;
 
 typedef struct {
@@ -27,6 +29,7 @@ typedef struct {
     int cap;
     int size;
     int labels;
+    int strings;
 } context_t;
 
 typedef struct {
