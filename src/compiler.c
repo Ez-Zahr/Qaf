@@ -1,31 +1,31 @@
 #include "../include/compiler.h"
 
 void init_headers(sections_t* sections) {
-    char* rodata = ".section .rodata\n";
-    sections->rodata = (char*) calloc(strlen(rodata) + 1, sizeof(char));
-    strcat(sections->rodata, rodata);
+    wchar_t* rodata = L".section .rodata\n";
+    sections->rodata = (wchar_t*) calloc(wcslen(rodata) + 1, sizeof(wchar_t));
+    wcscat(sections->rodata, rodata);
 
-    char* text = ".section .text\n.globl _start\n_start:\n\tcallq _entry\n\tmovq %rax, %rdi\n\tmovq $60, %rax\n\tsyscall\n.globl _entry\n_entry:\n";
-    sections->text = (char*) calloc(strlen(text) + 1, sizeof(char));
-    strcat(sections->text, text);
+    wchar_t* text = L".section .text\n.globl _start\n_start:\n\tcallq _entry\n\tmovq %rax, %rdi\n\tmovq $60, %rax\n\tsyscall\n.globl _entry\n_entry:\n";
+    sections->text = (wchar_t*) calloc(wcslen(text) + 1, sizeof(wchar_t));
+    wcscat(sections->text, text);
 }
 
 void init_prologue(sections_t* sections, context_t* context) {
-    sections->text = (char*) realloc(sections->text, (strlen(sections->text) + 30) * sizeof(char));
-    strcat(sections->text, "\tpushq %rbp\n\tmovq %rsp, %rbp\n");
+    sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + 30) * sizeof(wchar_t));
+    wcscat(sections->text, L"\tpushq %rbp\n\tmovq %rsp, %rbp\n");
 
     if (context->size) {
-        char* alloc = (char*) calloc(24, sizeof(char));
-        sprintf(alloc, "\tsubq $%d, %%rsp\n", context->size * 8);
-        sections->text = (char*) realloc(sections->text, (strlen(sections->text) + strlen(alloc) + 1) * sizeof(char));
-        strcat(sections->text, alloc);
+        wchar_t* alloc = (wchar_t*) calloc(24, sizeof(wchar_t));
+        swprintf(alloc, 24, L"\tsubq $%d, %%rsp\n", context->size * 8);
+        sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(alloc) + 1) * sizeof(wchar_t));
+        wcscat(sections->text, alloc);
         free(alloc);
     }
 }
 
 void init_epilogue(sections_t* sections, context_t* context) {
-    sections->text = (char*) realloc(sections->text, (strlen(sections->text) + 32) * sizeof(char));
-    strcat(sections->text, "\tmovq $0, %rax\n\tleaveq\n\tretq\n");
+    sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + 32) * sizeof(wchar_t));
+    wcscat(sections->text, L"\tmovq $0, %rax\n\tleaveq\n\tretq\n");
 }
 
 void free_sections(sections_t* sections) {
@@ -57,12 +57,12 @@ int get_offset(context_t* context, wchar_t* id) {
     return context->size * 8;
 }
 
-int extract_offset(char* offset) {
-    int len = strchr(offset, '(') - offset;
-    char sub[len];
+long extract_offset(wchar_t* offset) {
+    int len = wcschr(offset, L'(') - offset;
+    wchar_t sub[len];
     memset(sub, 0, len);
-    strncpy(sub, &offset[1], len - 1);
-    return atoi(sub);
+    wcsncpy(sub, &offset[1], len - 1);
+    return wcstol(sub, 0, 10);
 }
 
 bind_type_t tok_to_bind_type(tok_type_t type) {
@@ -94,9 +94,9 @@ bind_type_t tok_to_bind_type(tok_type_t type) {
     }
 }
 
-char* get_label(context_t* context) {
-    char* label = (char*) calloc(8, sizeof(char));
-    sprintf(label, ".L%d", context->labels++);
+wchar_t* get_label(context_t* context) {
+    wchar_t* label = (wchar_t*) calloc(8, sizeof(wchar_t));
+    swprintf(label, 7, L".L%d", context->labels++);
     return label;
 }
 
@@ -119,8 +119,9 @@ instr_t* _process_offset(context_t* context, instr_t* instr) {
             }
             instr_t* new_instr = (instr_t*) calloc(1, sizeof(instr_t));
             new_instr->type = -1;
-            new_instr->data = (char*) calloc(strlen(instr->data) + 12, sizeof(char));
-            sprintf(new_instr->data, "\tpushq %s\n", instr->data);
+            size_t len = wcslen(instr->data) + 12;
+            new_instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
+            swprintf(new_instr->data, len, L"\tpushq %ls\n", instr->data);
             free_instr(instr);
             return new_instr;
         }
@@ -129,26 +130,27 @@ instr_t* _process_offset(context_t* context, instr_t* instr) {
     }
 }
 
-instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, char* op);
-instr_t* _compile_unary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, char* op);
+instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, wchar_t* op);
+instr_t* _compile_unary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, wchar_t* op);
 
 instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
     switch (ast->tok->type) {
         case TOK_PRINT: {
-            char* op;
+            wchar_t* op;
             instr_t* left = _compile(ast->left, context, sections);
             switch (context->offsets[extract_offset(left->data) / 8 - 1].type) {
-                case BIND_INT: op = "\tmovq %s, %%r8\n\tcallq print_int\n"; break;
-                case BIND_CHAR: op = "\tmovq %s, %%r8\n\tcallq print_char\n"; break;
-                case BIND_STR: op = "\tmovq %s, %%r8\n\tmovq $14, %%r9\n\tcallq print\n"; break;
+                case BIND_INT: op = L"\tmovq %ls, %%r8\n\tcallq print_int\n"; break;
+                case BIND_CHAR: op = L"\tmovq %ls, %%r8\n\tcallq print_char\n"; break;
+                case BIND_STR: op = L"\tmovq %ls, %%r8\n\tmovq $14, %%r9\n\tcallq print\n"; break;
                 default:
                     wprintf(L"Error: Undefined variable `%ls`\n", ast->left->tok->data);
                     exit(1);
             }
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            instr->data = (char*) calloc(strlen(left->data) + strlen(op) + 1, sizeof(char));
-            sprintf(instr->data, op, left->data);
+            size_t len = wcslen(left->data) + wcslen(op);
+            instr->data = (wchar_t*) calloc(len + 1, sizeof(wchar_t));
+            swprintf(instr->data, len, op, left->data);
             free_instr(left);
             return instr;
         }
@@ -157,47 +159,47 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
             int offset = get_offset(context, ast->tok->data);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = INS_OFFSET;
-            instr->data = (char*) calloc(16, sizeof(char));
-            sprintf(instr->data, "-%d(%%rbp)", offset);
+            instr->data = (wchar_t*) calloc(16, sizeof(wchar_t));
+            swprintf(instr->data, 16, L"-%d(%%rbp)", offset);
             return instr;
         }
 
         case TOK_INT: {
-            char buf[32];
-            wcstombs(buf, ast->tok->data, 32);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            instr->data = (char*) calloc(strlen(buf) + 12, sizeof(char));
-            sprintf(instr->data, "\tpushq $%s\n", buf);
+            int len = ast->tok->len + 16;
+            instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
+            swprintf(instr->data, len, L"\tpushq $%ls\n", ast->tok->data);
             return instr;
         }
 
         case TOK_BOOL: {
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            instr->data = (char*) calloc(12, sizeof(char));
-            sprintf(instr->data, "\tpushq $%d\n", !wcscmp(ast->tok->data, L"صح"));
+            instr->data = (wchar_t*) calloc(12, sizeof(wchar_t));
+            swprintf(instr->data, 12, L"\tpushq $%d\n", !wcscmp(ast->tok->data, L"صح"));
             return instr;
         }
 
         case TOK_CHAR: {
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            instr->data = (char*) calloc(16, sizeof(char));
-            sprintf(instr->data, "\tpushq $%d\n", wctob(ast->tok->data[0]));
+            instr->data = (wchar_t*) calloc(16, sizeof(wchar_t));
+            swprintf(instr->data, 16, L"\tpushq $%d\n", wctob(ast->tok->data[0]));
             return instr;
         }
 
         case TOK_STR: {
             int strnum = context->strings++;
-            char buf[64];
-            sprintf(buf, "\tstr%d: .string \"Hello, world!\\n\"\n\t.equ len%d, .-str%d\n", strnum, strnum, strnum);
-            sections->rodata = (char*) realloc(sections->rodata, (strlen(sections->rodata) + strlen(buf) + 1) * sizeof(char));
-            strcat(sections->rodata, buf);
+            size_t len = wcslen(ast->tok->data) + 50;
+            wchar_t buf[len];
+            swprintf(buf, len, L"\tstr%d: .string \"%ls\"\n\t.equ len%d, .-str%d\n", strnum, ast->tok->data, strnum, strnum);
+            sections->rodata = (wchar_t*) realloc(sections->rodata, (wcslen(sections->rodata) + wcslen(buf) + 1) * sizeof(wchar_t));
+            wcscat(sections->rodata, buf);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            instr->data = (char*) calloc(20, sizeof(char));
-            sprintf(instr->data, "\tpushq $str%d\n", strnum);
+            instr->data = (wchar_t*) calloc(20, sizeof(wchar_t));
+            swprintf(instr->data, 20, L"\tpushq $str%d\n", strnum);
             return instr;
         }
 
@@ -207,89 +209,91 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
             context->offsets[extract_offset(left->data) / 8 - 1].type = tok_to_bind_type(ast->right->tok->type);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            instr->data = (char*) calloc(strlen(left->data) + strlen(right->data) + 32, sizeof(char));
-            sprintf(instr->data, "%s\tpopq %s\n", right->data, left->data);
+            size_t len = wcslen(left->data) + wcslen(right->data) + 16;
+            instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
+            swprintf(instr->data, len, L"%ls\tpopq %ls\n", right->data, left->data);
             free_instr(left);
             free_instr(right);
             return instr;
         }
 
         case TOK_PLUS: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\taddq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\taddq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_MINUS: {
             if (!ast->right) {
-                return _compile_unary_instr(ast, context, sections, -1, "\tpopq %rax\n\tnegq %rax\n\tpushq %rax\n");
+                return _compile_unary_instr(ast, context, sections, -1, L"\tpopq %rax\n\tnegq %rax\n\tpushq %rax\n");
             }
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tsubq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tsubq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_MUL: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\timulq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\timulq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_DIV: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rax\n");
         }
 
         case TOK_MOD: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rdx\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tmovq $0, %rdx\n\tidivq %rbx\n\tpushq %rdx\n");
         }
 
         case TOK_AND: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tandq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tandq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_OR: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\torq %rbx, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\torq %rbx, %rax\n\tpushq %rax\n");
         }
 
         case TOK_NOT: {
-            return _compile_unary_instr(ast, context, sections, -1, "\tpopq %rax\n\tcmpq $0, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_unary_instr(ast, context, sections, -1, L"\tpopq %rax\n\tcmpq $0, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_EQ: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsete %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_NE: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetne %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetne %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_LT: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetl %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetl %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_LTE: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetle %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetle %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_GT: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetg %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetg %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_GTE: {
-            return _compile_binary_instr(ast, context, sections, -1, "\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetge %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
+            return _compile_binary_instr(ast, context, sections, -1, L"\tpopq %rbx\n\tpopq %rax\n\tcmpq %rbx, %rax\n\tsetge %al\n\tmovzbq %al, %rax\n\tpushq %rax\n");
         }
 
         case TOK_IF: {
             instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
-            char* buf = (char*) calloc(1, sizeof(char));
+            wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->right->size; i++) {
                 instr_t* ins = _compile(ast->right->astList[i], context, sections);
-                buf = (char*) realloc(buf, (strlen(buf) + strlen(ins->data) + 1) * sizeof(char));
-                strcat(buf, ins->data);
+                buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(ins->data) + 1) * sizeof(wchar_t));
+                wcscat(buf, ins->data);
                 free_instr(ins);
             }
 
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
 
-            char* format = "%s\tpopq %%rax\n\tcmpq $1, %%rax\n\tjne %s\n%s%s:\n";
-            char* label = get_label(context);
-            instr->data = (char*) calloc(strlen(left->data) + strlen(buf) + strlen(label) * 2 + strlen(format) + 1, sizeof(char));
-            sprintf(instr->data, format, left->data, label, buf, label);
+            wchar_t* format = L"%ls\tpopq %%rax\n\tcmpq $1, %%rax\n\tjne %ls\n%ls%ls:\n";
+            wchar_t* label = get_label(context);
+            size_t len = wcslen(left->data) + wcslen(buf) + wcslen(label) * 2 + wcslen(format);
+            instr->data = (wchar_t*) calloc(len + 1, sizeof(wchar_t));
+            swprintf(instr->data, len, format, left->data, label, buf, label);
 
             free_instr(left);
             free(buf);
@@ -299,22 +303,23 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 
         case TOK_WHILE: {
             instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
-            char* buf = (char*) calloc(1, sizeof(char));
+            wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->right->size; i++) {
                 instr_t* ins = _compile(ast->right->astList[i], context, sections);
-                buf = (char*) realloc(buf, (strlen(buf) + strlen(ins->data) + 1) * sizeof(char));
-                strcat(buf, ins->data);
+                buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(ins->data) + 1) * sizeof(wchar_t));
+                wcscat(buf, ins->data);
                 free_instr(ins);
             }
 
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
 
-            char* format = "%s:\n%s\tpopq %%rax\n\tcmpq $1, %%rax\n\tjne %s\n%s\tjmp %s\n%s:\n";
-            char* l1 = get_label(context);
-            char* l2 = get_label(context);
-            instr->data = (char*) calloc(strlen(left->data) + strlen(buf) + strlen(l1) * 2 + strlen(l2) * 2 + strlen(format) + 1, sizeof(char));
-            sprintf(instr->data, format, l1, left->data, l2, buf, l1, l2);
+            wchar_t* format = L"%ls:\n%ls\tpopq %%rax\n\tcmpq $1, %%rax\n\tjne %ls\n%ls\tjmp %ls\n%ls:\n";
+            wchar_t* l1 = get_label(context);
+            wchar_t* l2 = get_label(context);
+            size_t len = wcslen(left->data) + wcslen(buf) + wcslen(l1) * 2 + wcslen(l2) * 2 + wcslen(format);
+            instr->data = (wchar_t*) calloc(len + 1, sizeof(wchar_t));
+            swprintf(instr->data, len, format, l1, left->data, l2, buf, l1, l2);
 
             free_instr(left);
             free(buf);
@@ -331,23 +336,24 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
             instr_t* end = _compile(ast->right->astList[1], context, sections);
             instr_t* step = _compile(ast->right->astList[2], context, sections);
 
-            char* buf = (char*) calloc(1, sizeof(char));
+            wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->size; i++) {
                 instr_t* ins = _compile(ast->astList[i], context, sections);
-                buf = (char*) realloc(buf, (strlen(buf) + strlen(ins->data) + 1) * sizeof(char));
-                strcat(buf, ins->data);
+                buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(ins->data) + 1) * sizeof(wchar_t));
+                wcscat(buf, ins->data);
                 free_instr(ins);
             }
 
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
 
-            char* format = "%s\tpopq %s\n%s:\n%s\tpopq %%rax\n\tcmpq %%rax, %s\n\t%s %s\n%s%s\tpopq %%rax\n\taddq %%rax, %s\n\tjmp %s\n%s:\n";
-            char* jmp = (ast->right->astList[2]->tok->type == TOK_MINUS)? "jl" : "jg";
-            char* l1 = get_label(context);
-            char* l2 = get_label(context);
-            instr->data = (char*) calloc(strlen(left->data) * 3 + strlen(buf) + strlen(start->data) + strlen(end->data) + strlen(step->data) + strlen(l1) * 2 + strlen(l2) * 2 + strlen(format) + 3, sizeof(char));
-            sprintf(instr->data, format, start->data, left->data, l1, end->data, left->data, jmp, l2, buf, step->data, left->data, l1, l2);
+            wchar_t* format = L"%ls\tpopq %ls\n%ls:\n%ls\tpopq %%rax\n\tcmpq %%rax, %ls\n\t%ls %ls\n%ls%ls\tpopq %%rax\n\taddq %%rax, %ls\n\tjmp %ls\n%ls:\n";
+            wchar_t* jmp = (ast->right->astList[2]->tok->type == TOK_MINUS)? L"jl" : L"jg";
+            wchar_t* l1 = get_label(context);
+            wchar_t* l2 = get_label(context);
+            size_t len = wcslen(left->data) * 3 + wcslen(buf) + wcslen(start->data) + wcslen(end->data) + wcslen(step->data) + wcslen(l1) * 2 + wcslen(l2) * 2 + wcslen(format) + 2;
+            instr->data = (wchar_t*) calloc(len + 1, sizeof(wchar_t));
+            swprintf(instr->data, len, format, start->data, left->data, l1, end->data, left->data, jmp, l2, buf, step->data, left->data, l1, l2);
 
             free_instr(left);
             free_instr(start);
@@ -366,27 +372,27 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
     }
 }
 
-instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, char* op) {
+instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, wchar_t* op) {
     instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
     instr_t* right = _process_offset(context, _compile(ast->right, context, sections));
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
-    instr->data = (char*) calloc(strlen(left->data) + strlen(right->data) + strlen(op) + 1, sizeof(char));
-    strcat(instr->data, left->data);
-    strcat(instr->data, right->data);
-    strcat(instr->data, op);
+    instr->data = (wchar_t*) calloc(wcslen(left->data) + wcslen(right->data) + wcslen(op) + 1, sizeof(wchar_t));
+    wcscat(instr->data, left->data);
+    wcscat(instr->data, right->data);
+    wcscat(instr->data, op);
     free_instr(left);
     free_instr(right);
     return instr;
 }
 
-instr_t* _compile_unary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, char* op) {
+instr_t* _compile_unary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, wchar_t* op) {
     instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
-    instr->data = (char*) calloc(strlen(left->data) + strlen(op) + 1, sizeof(char));
-    strcat(instr->data, left->data);
-    strcat(instr->data, op);
+    instr->data = (wchar_t*) calloc(wcslen(left->data) + wcslen(op) + 1, sizeof(wchar_t));
+    wcscat(instr->data, left->data);
+    wcscat(instr->data, op);
     free_instr(left);
     return instr;
 }
@@ -397,17 +403,17 @@ void compile(parser_t* parser, int _s) {
     context_t context;
     init_context(&context);
 
-    char* buf = (char*) calloc(1, sizeof(char));
+    wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
     for (int i = 0; i < parser->size; i++) {
         instr_t* instr = _compile(parser->astList[i], &context, &sections);
-        buf = (char*) realloc(buf, (strlen(buf) + strlen(instr->data) + 1) * sizeof(char));
-        strcat(buf, instr->data);
+        buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(instr->data) + 1) * sizeof(wchar_t));
+        wcscat(buf, instr->data);
         free_instr(instr);
     }
     
     init_prologue(&sections, &context);
-    sections.text = (char*) realloc(sections.text, (strlen(sections.text) + strlen(buf) + 1) * sizeof(char));
-    strcat(sections.text, buf);
+    sections.text = (wchar_t*) realloc(sections.text, (wcslen(sections.text) + wcslen(buf) + 1) * sizeof(wchar_t));
+    wcscat(sections.text, buf);
     free(buf);
     init_epilogue(&sections, &context);
 
@@ -416,8 +422,8 @@ void compile(parser_t* parser, int _s) {
         wprintf(L"Could not open file ./a.s\n");
         exit(1);
     }
-    fputs(sections.rodata, output);
-    fputs(sections.text, output);
+    fputws(sections.rodata, output);
+    fputws(sections.text, output);
     fclose(output);
     
     if (!_s) {

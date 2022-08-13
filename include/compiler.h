@@ -15,7 +15,7 @@ typedef enum {
 } bind_type_t;
 
 typedef struct {
-    char* data;
+    wchar_t* data;
     instr_type_t type;
 } instr_t;
 
@@ -33,8 +33,8 @@ typedef struct {
 } context_t;
 
 typedef struct {
-    char* rodata;
-    char* text;
+    wchar_t* rodata;
+    wchar_t* text;
     int labels;
 } sections_t;
 
