@@ -14,16 +14,16 @@ void init_prologue(sections_t* sections, context_t* context) {
     sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + 30) * sizeof(wchar_t));
     wcscat(sections->text, L"\tpushq %rbp\n\tmovq %rsp, %rbp\n");
 
-    if (context->size) {
+    if (context->offsets->size) {
         wchar_t* alloc = (wchar_t*) calloc(24, sizeof(wchar_t));
-        swprintf(alloc, 24, L"\tsubq $%d, %%rsp\n", context->size * 8);
+        swprintf(alloc, 24, L"\tsubq $%d, %%rsp\n", context->offsets->size * 8);
         sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(alloc) + 1) * sizeof(wchar_t));
         wcscat(sections->text, alloc);
         free(alloc);
     }
 }
 
-void init_epilogue(sections_t* sections, context_t* context) {
+void init_epilogue(sections_t* sections) {
     sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + 32) * sizeof(wchar_t));
     wcscat(sections->text, L"\tmovq $0, %rax\n\tleaveq\n\tretq\n");
 }
@@ -34,27 +34,31 @@ void free_sections(sections_t* sections) {
 }
 
 void init_context(context_t* context) {
-    context->cap = 8;
-    context->size = 0;
-    context->labels = 0;
-    context->strings = 0;
-    context->offsets = (id_t*) calloc(context->cap, sizeof(id_t));
+    context->offsets = (_offsets_list_t*) calloc(1, sizeof(_offsets_list_t));
+    context->offsets->cap = 8;
+    context->offsets->size = 0;
+    context->offsets->arr = (wchar_t**) calloc(context->offsets->cap, sizeof(wchar_t*));
+    context->offsets->types = (bind_type_t*) calloc(context->offsets->cap, sizeof(bind_type_t));
+    context->strings = (_strings_list_t*) calloc(1, sizeof(_strings_list_t));
+    context->strings->cap = 8;
+    context->strings->size = 0;
+    context->strings->arr = (wchar_t**) calloc(context->strings->cap, sizeof(wchar_t*));
 }
 
 int get_offset(context_t* context, wchar_t* id) {
-    for (int i = 0; i < context->size; i++) {
-        if (!wcscmp(context->offsets[i].id, id)) {
+    for (int i = 0; i < context->offsets->size; i++) {
+        if (!wcscmp(context->offsets->arr[i], id)) {
             return (i + 1) * 8;
         }
     }
 
-    context->offsets[context->size].id = id;
-    context->offsets[context->size++].type = -1;
-    if (context->size >= context->cap) {
-        context->cap *= 2;
-        context->offsets = (id_t*) realloc(context->offsets, context->cap * sizeof(id_t));
+    context->offsets->arr[context->offsets->size] = id;
+    context->offsets->types[context->offsets->size++] = -1;
+    if (context->offsets->size >= context->offsets->cap) {
+        context->offsets->cap *= 2;
+        context->offsets->arr = (wchar_t**) realloc(context->offsets->arr, context->offsets->cap * sizeof(wchar_t*));
     }
-    return context->size * 8;
+    return context->offsets->size * 8;
 }
 
 long extract_offset(wchar_t* offset) {
@@ -101,7 +105,11 @@ wchar_t* get_label(context_t* context) {
 }
 
 void free_context(context_t* context) {
+    free(context->offsets->arr);
+    free(context->offsets->types);
     free(context->offsets);
+    free(context->strings->arr);
+    free(context->strings);
 }
 
 void free_instr(instr_t* instr) {
@@ -109,12 +117,12 @@ void free_instr(instr_t* instr) {
     free(instr);
 }
 
-instr_t* _process_offset(context_t* context, instr_t* instr) {
+instr_t* _process_instr(context_t* context, instr_t* instr) {
     switch (instr->type) {
         case INS_OFFSET: {
-            id_t id = context->offsets[extract_offset(instr->data) / 8 - 1];
-            if (id.type == -1) {
-                wprintf(L"Error: Undefined variable `%ls`\n", id.id);
+            long pos = extract_offset(instr->data) / 8 - 1;
+            if (context->offsets->types[pos] == -1) {
+                wprintf(L"Error: Undefined variable `%ls`\n", context->offsets->arr[pos]);
                 exit(1);
             }
             instr_t* new_instr = (instr_t*) calloc(1, sizeof(instr_t));
@@ -124,6 +132,9 @@ instr_t* _process_offset(context_t* context, instr_t* instr) {
             swprintf(new_instr->data, len, L"\tpushq %ls\n", instr->data);
             free_instr(instr);
             return new_instr;
+        }
+
+        case INS_STRING: {
         }
 
         default: return instr;
@@ -138,7 +149,7 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
         case TOK_PRINT: {
             wchar_t* op;
             instr_t* left = _compile(ast->left, context, sections);
-            switch (context->offsets[extract_offset(left->data) / 8 - 1].type) {
+            switch (context->offsets->types[extract_offset(left->data) / 8 - 1]) {
                 case BIND_INT: op = L"\tmovq %ls, %%r8\n\tcallq print_int\n"; break;
                 case BIND_CHAR: op = L"\tmovq %ls, %%r8\n\tcallq print_char\n"; break;
                 case BIND_STR: op = L"\tmovq %ls, %%r8\n\tmovq $14, %%r9\n\tcallq print\n"; break;
@@ -190,7 +201,7 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
         }
 
         case TOK_STR: {
-            int strnum = context->strings++;
+            int strnum = context->strings->size++;
             size_t len = wcslen(ast->tok->data) + 50;
             wchar_t buf[len];
             swprintf(buf, len, L"\tstr%d: .string \"%ls\"\n\t.equ len%d, .-str%d\n", strnum, ast->tok->data, strnum, strnum);
@@ -198,15 +209,15 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
             wcscat(sections->rodata, buf);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            instr->data = (wchar_t*) calloc(20, sizeof(wchar_t));
-            swprintf(instr->data, 20, L"\tpushq $str%d\n", strnum);
+            instr->data = (wchar_t*) calloc(12, sizeof(wchar_t));
+            swprintf(instr->data, 20, L"$str%d", strnum);
             return instr;
         }
 
         case TOK_ASSIGN: {
             instr_t* left = _compile(ast->left, context, sections);
-            instr_t* right = _process_offset(context, _compile(ast->right, context, sections));
-            context->offsets[extract_offset(left->data) / 8 - 1].type = tok_to_bind_type(ast->right->tok->type);
+            instr_t* right = _process_instr(context, _compile(ast->right, context, sections));
+            context->offsets->types[extract_offset(left->data) / 8 - 1] = tok_to_bind_type(ast->right->tok->type);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
             size_t len = wcslen(left->data) + wcslen(right->data) + 16;
@@ -277,7 +288,7 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
         }
 
         case TOK_IF: {
-            instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
+            instr_t* left = _process_instr(context, _compile(ast->left, context, sections));
             wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->right->size; i++) {
                 instr_t* ins = _compile(ast->right->astList[i], context, sections);
@@ -302,7 +313,7 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
         }
 
         case TOK_WHILE: {
-            instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
+            instr_t* left = _process_instr(context, _compile(ast->left, context, sections));
             wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->right->size; i++) {
                 instr_t* ins = _compile(ast->right->astList[i], context, sections);
@@ -330,7 +341,7 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 
         case TOK_FOR: {
             instr_t* left = _compile(ast->left, context, sections);
-            context->offsets[extract_offset(left->data) / 8 - 1].type = BIND_INT;
+            context->offsets->types[extract_offset(left->data) / 8 - 1] = BIND_INT;
 
             instr_t* start = _compile(ast->right->astList[0], context, sections);
             instr_t* end = _compile(ast->right->astList[1], context, sections);
@@ -373,8 +384,8 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 }
 
 instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, wchar_t* op) {
-    instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
-    instr_t* right = _process_offset(context, _compile(ast->right, context, sections));
+    instr_t* left = _process_instr(context, _compile(ast->left, context, sections));
+    instr_t* right = _process_instr(context, _compile(ast->right, context, sections));
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
     instr->data = (wchar_t*) calloc(wcslen(left->data) + wcslen(right->data) + wcslen(op) + 1, sizeof(wchar_t));
@@ -387,7 +398,7 @@ instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sect
 }
 
 instr_t* _compile_unary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, wchar_t* op) {
-    instr_t* left = _process_offset(context, _compile(ast->left, context, sections));
+    instr_t* left = _process_instr(context, _compile(ast->left, context, sections));
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
     instr->data = (wchar_t*) calloc(wcslen(left->data) + wcslen(op) + 1, sizeof(wchar_t));
@@ -415,7 +426,7 @@ void compile(parser_t* parser, int _s) {
     sections.text = (wchar_t*) realloc(sections.text, (wcslen(sections.text) + wcslen(buf) + 1) * sizeof(wchar_t));
     wcscat(sections.text, buf);
     free(buf);
-    init_epilogue(&sections, &context);
+    init_epilogue(&sections);
 
     FILE* output;
     if ((output = fopen("./a.s", "w")) == NULL) {
