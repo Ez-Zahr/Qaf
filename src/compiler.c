@@ -61,6 +61,14 @@ int get_offset(context_t* context, wchar_t* id) {
     return context->offsets->size * 8;
 }
 
+void bind_string(context_t* context, wchar_t* id) {
+    context->strings->arr[context->strings->size - 1] = id;
+    if (context->strings->size >= context->strings->cap) {
+        context->strings->cap *= 2;
+        context->strings->arr = (wchar_t**) realloc(context->strings->arr, context->strings->cap * sizeof(wchar_t*));
+    }
+}
+
 long extract_offset(wchar_t* offset) {
     int len = wcschr(offset, L'(') - offset;
     wchar_t sub[len];
@@ -135,6 +143,13 @@ instr_t* _process_instr(context_t* context, instr_t* instr) {
         }
 
         case INS_STRING: {
+            instr_t* new_instr = (instr_t*) calloc(1, sizeof(instr_t));
+            new_instr->type = -1;
+            size_t len = wcslen(instr->data) + 32;
+            new_instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
+            swprintf(new_instr->data, len, L"\tpushq $len%ls\n\tpushq $str%ls\n", instr->data);
+            free_instr(instr);
+            return new_instr;
         }
 
         default: return instr;
@@ -202,21 +217,27 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 
         case TOK_STR: {
             int strnum = context->strings->size++;
+
             size_t len = wcslen(ast->tok->data) + 50;
             wchar_t buf[len];
             swprintf(buf, len, L"\tstr%d: .string \"%ls\"\n\t.equ len%d, .-str%d\n", strnum, ast->tok->data, strnum, strnum);
             sections->rodata = (wchar_t*) realloc(sections->rodata, (wcslen(sections->rodata) + wcslen(buf) + 1) * sizeof(wchar_t));
             wcscat(sections->rodata, buf);
+
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
-            instr->type = -1;
-            instr->data = (wchar_t*) calloc(12, sizeof(wchar_t));
-            swprintf(instr->data, 20, L"$str%d", strnum);
+            instr->type = INS_STRING;
+            instr->data = (wchar_t*) calloc(8, sizeof(wchar_t));
+            swprintf(instr->data, 20, L"%d", strnum);
             return instr;
         }
 
         case TOK_ASSIGN: {
             instr_t* left = _compile(ast->left, context, sections);
-            instr_t* right = _process_instr(context, _compile(ast->right, context, sections));
+            instr_t* right = _compile(ast->right, context, sections);
+            if (right->type == INS_STRING) {
+                bind_string(context, left->data);
+            }
+            right = _process_instr(context, right);
             context->offsets->types[extract_offset(left->data) / 8 - 1] = tok_to_bind_type(ast->right->tok->type);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
