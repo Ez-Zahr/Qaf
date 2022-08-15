@@ -28,7 +28,7 @@ typedef struct {
 } _offsets_list_t;
 
 typedef struct {
-    wchar_t** arr;
+    int* arr;
     int cap;
     int size;
 } _strings_list_t;
