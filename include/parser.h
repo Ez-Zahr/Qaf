@@ -12,24 +12,18 @@ typedef enum {
     PRI_MAX
 } op_prior_t;
 
-typedef struct node_t {
+typedef struct ast_t {
     token_t* tok;
-    struct node_t* left;
-    struct node_t* right;
-    struct node_t** astList;
+    struct ast_t* left;
+    struct ast_t* right;
+    struct ast_t** list;
     int cap;
     int size;
-} node_t;
+} ast_t;
 
-typedef struct {
-    node_t** astList;
-    int cap;
-    int size;
-} parser_t;
-
-void init_parser(parser_t* parser);
-void parse(lexer_t* lexer, parser_t* parser);
-void print_parser(parser_t* parser);
-void free_parser(parser_t* parser);
+void init_ast_list(ast_t* ast);
+void parse(lexer_t* lexer, ast_t* root);
+void print_ast_root(ast_t* root);
+void free_ast(ast_t* ast);
 
 #endif

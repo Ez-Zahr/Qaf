@@ -3,6 +3,6 @@
 
 #include "parser.h"
 
-int eval(node_t* ast);
+int eval(ast_t* ast);
 
 #endif

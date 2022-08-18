@@ -38,8 +38,8 @@ int main(int argc, char* argv[]) {
     init_src(&src);
     lexer_t lexer;
     init_lexer(&lexer);
-    parser_t parser;
-    init_parser(&parser);
+    ast_t root;
+    init_ast_list(&root);
     
     read_src(filename, &src);
 
@@ -51,17 +51,17 @@ int main(int argc, char* argv[]) {
     }
 
     if (err_status == ERR_NONE) {
-        parse(&lexer, &parser);
+        parse(&lexer, &root);
         if (_a) {
-            print_parser(&parser);
+            print_ast_root(&root);
         }
     }
 
     if (err_status == ERR_NONE) {
-        compile(&parser, _s);
+        compile(&root, _s);
     }
 
-    free_parser(&parser);
+    free_ast(&root);
     free_lexer(&lexer);
     free_src(&src);
     return err_status;

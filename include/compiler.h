@@ -46,6 +46,6 @@ typedef struct {
     int labels;
 } sections_t;
 
-void compile(parser_t* parser, int _s);
+void compile(ast_t* root, int _s);
 
 #endif

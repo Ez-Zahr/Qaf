@@ -12,7 +12,8 @@ typedef enum {
     ERR_NONE,
     ERR_LEX,
     ERR_PARSE,
-    ERR_COMPILE
+    ERR_COMPILE,
+    ERR_EVAL
 } ERROR_STATUS;
 ERROR_STATUS err_status;
 
