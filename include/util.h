@@ -8,6 +8,14 @@
 #include <wchar.h>
 #include <locale.h>
 
+typedef enum {
+    ERR_NONE,
+    ERR_LEX,
+    ERR_PARSE,
+    ERR_COMPILE
+} ERROR_STATUS;
+ERROR_STATUS err_status;
+
 typedef struct {
     char* filename;
     wchar_t* buf;

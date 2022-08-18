@@ -1,5 +1,7 @@
 #include "../include/lexer.h"
 
+extern ERROR_STATUS err_status;
+
 void init_lexer(lexer_t* lexer) {
     lexer->cap = 64;
     lexer->size = 0;
@@ -14,6 +16,8 @@ int isaralpha(wchar_t c) {
 tok_type_t get_keyword_type(wchar_t* keyword) {
     if (!wcscmp(keyword, L"اطبع")) {
         return TOK_PRINT;
+    } else if (!wcscmp(keyword, L"اقرأ")) {
+        return TOK_READ;
     } else if (!wcscmp(keyword, L"صح") || !wcscmp(keyword, L"خطأ")) {
         return TOK_BOOL;
     } else if (!wcscmp(keyword, L"أو")) {
@@ -67,7 +71,8 @@ tok_type_t get_op_type(wchar_t* op) {
         return TOK_GTE;
     } else {
         wprintf(L"Error: Undefined operator `%ls`\n", op);
-        exit(1);
+        err_status = ERR_LEX;
+        return -1;
     }
 }
 
@@ -127,7 +132,8 @@ void lex(src_t* src, lexer_t* lexer) {
                 if (src->buf[src->pos] == L'.') {
                     if (period) {
                         wprintf(L"Error: Invalid number format\n");
-                        exit(1);
+                        err_status = ERR_LEX;
+                        return;
                     } else {
                         tok->type = TOK_FLOAT;
                         period = 1;
@@ -171,7 +177,8 @@ void lex(src_t* src, lexer_t* lexer) {
             tok->data[tok->len] = L'\0';
             if (src->buf[src->pos] != L'’') {
                 wprintf(L"Error: Invalid character format\n");
-                exit(1);
+                err_status = ERR_LEX;
+                return;
             }
             src->pos++;
 
@@ -188,7 +195,8 @@ void lex(src_t* src, lexer_t* lexer) {
             tok->data[tok->len] = L'\0';
             if (src->buf[src->pos] != L'"') {
                 wprintf(L"Error: Missing closing double quote\n");
-                exit(1);
+                err_status = ERR_LEX;
+                return;
             }
             src->pos++;
 
@@ -204,8 +212,9 @@ void lex(src_t* src, lexer_t* lexer) {
             continue;
 
         } else {
-            wprintf(L"Error: Undefined symbol `%lc` at %d:%d\n", src->buf[src->pos], line, src->pos);
-            exit(1);
+            wprintf(L"Error: Undefined symbol `%lc` at %d:%d\n", src->buf[src->pos], line, src->pos + 1);
+            err_status = ERR_LEX;
+            return;
         }
 
         if (lexer->size >= lexer->cap) {
@@ -220,8 +229,9 @@ void lex(src_t* src, lexer_t* lexer) {
 
 wchar_t* tok_type_to_str(tok_type_t type) {
     switch (type) {
-        case TOK_ID: return L"TOK_ID";
         case TOK_PRINT: return L"TOK_PRINT";
+        case TOK_READ: return L"TOK_READ";
+        case TOK_ID: return L"TOK_ID";
         case TOK_INT: return L"TOK_INT";
         case TOK_FLOAT: return L"TOK_FLOAT";
         case TOK_BOOL: return L"TOK_BOOL";

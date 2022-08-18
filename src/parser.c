@@ -1,5 +1,7 @@
 #include "../include/parser.h"
 
+extern ERROR_STATUS err_status;
+
 void init_parser(parser_t* parser) {
     parser->cap = 32;
     parser->size = 0;
@@ -65,6 +67,9 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             node_t* expr = (node_t*) calloc(1, sizeof(node_t));
             expr->tok = &lexer->tokens[lexer->pos++];
             expr->left = parse_primary_expr(lexer);
+            if (err_status != ERR_NONE) {
+                return expr;
+            }
             expr->right = parse_primary_expr(lexer);
             return expr;
         }
@@ -72,8 +77,15 @@ node_t* parse_primary_expr(lexer_t* lexer) {
         case TOK_FOR: {
             token_t* tok = &lexer->tokens[lexer->pos++];
             node_t* left = parse_primary_expr(lexer);
+            if (err_status != ERR_NONE) {
+                return left;
+            }
             lexer->pos++;
             node_t* right = parse_primary_expr(lexer);
+            if (err_status != ERR_NONE) {
+                left->right = right;
+                return left;
+            }
             node_t* expr = parse_primary_expr(lexer);
             expr->tok = tok;
             expr->left = left;
@@ -84,9 +96,13 @@ node_t* parse_primary_expr(lexer_t* lexer) {
         case TOK_LPAREN: {
             lexer->pos++;
             node_t* expr = _parse(lexer, 1);
+            if (err_status != ERR_NONE) {
+                return expr;
+            }
             if (lexer->tokens[lexer->pos].type != TOK_RPAREN) {
                 wprintf(L"Error: Missing closing parenthesis\n");
-                exit(1);
+                err_status = ERR_PARSE;
+                return expr;
             }
             lexer->pos++;
             return expr;
@@ -104,9 +120,13 @@ node_t* parse_primary_expr(lexer_t* lexer) {
                     continue;
                 } else if (lexer->tokens[lexer->pos].type == TOK_EOF) {
                     wprintf(L"Error: Missing closing brace\n");
-                    exit(1);
+                    err_status = ERR_PARSE;
+                    return exprList;
                 }
                 exprList->astList[exprList->size++] = _parse(lexer, 0);
+                if (err_status != ERR_NONE) {
+                    return exprList;
+                }
                 if (exprList->size >= exprList->cap) {
                     exprList->cap *= 2;
                     exprList->astList = (node_t**) realloc(exprList->astList, exprList->cap * sizeof(node_t*));
@@ -128,12 +148,17 @@ node_t* parse_primary_expr(lexer_t* lexer) {
                     continue;
                 } else if (lexer->tokens[lexer->pos].type == TOK_SEMI) {
                     wprintf(L"Error: Invalid semicolon\n");
-                    exit(1);
+                    err_status = ERR_PARSE;
+                    return exprList;
                 } else if (lexer->tokens[lexer->pos].type == TOK_EOF) {
                     wprintf(L"Error: Missing closing bracket\n");
-                    exit(1);
+                    err_status = ERR_PARSE;
+                    return exprList;
                 }
                 exprList->astList[exprList->size++] = parse_primary_expr(lexer);
+                if (err_status != ERR_NONE) {
+                    return exprList;
+                }
                 if (exprList->size >= exprList->cap) {
                     exprList->cap *= 2;
                     exprList->astList = (node_t**) realloc(exprList->astList, exprList->cap * sizeof(node_t*));
@@ -150,22 +175,42 @@ node_t* parse_primary_expr(lexer_t* lexer) {
             return expr;
         }
 
+        case TOK_READ: {
+            node_t* expr = (node_t*) calloc(1, sizeof(node_t));
+            expr->tok = &lexer->tokens[lexer->pos++];
+            if (lexer->tokens[lexer->pos].type != TOK_ID) {
+                wprintf(L"Error: Expected an ID token after a READ token\n");
+                err_status = ERR_PARSE;
+                return expr;
+            }
+            expr->left = (node_t*) calloc(1, sizeof(node_t));
+            expr->left->tok = &lexer->tokens[lexer->pos++];
+            return expr;
+        }
+
         default: {
             token_t tok = lexer->tokens[lexer->pos];
             wprintf(L"Error: Invalid token `%ls` of type `%ls`\n", tok.data, tok_type_to_str(tok.type));
-            exit(1);
+            err_status = ERR_PARSE;
+            return 0;
         }
     }
 }
 
 node_t* _parse(lexer_t* lexer, int prior) {
     node_t* expr = (prior == PRI_MAX - 1)? parse_primary_expr(lexer) : _parse(lexer, prior + 1);
+    if (err_status != ERR_NONE) {
+        return expr;
+    }
     
     while (get_op_priority(lexer->tokens[lexer->pos].type) == prior) {
         node_t* op_node = (node_t*) calloc(1, sizeof(node_t));
         op_node->tok = &lexer->tokens[lexer->pos++];
         op_node->left = expr;
         op_node->right = (prior == PRI_MAX - 1)? parse_primary_expr(lexer) : _parse(lexer, prior + 1);
+        if (err_status != ERR_NONE) {
+            return op_node;
+        }
         expr = op_node;
     }
 
@@ -182,6 +227,9 @@ void parse(lexer_t* lexer, parser_t* parser) {
         }
 
         parser->astList[parser->size++] = _parse(lexer, 0);
+        if (err_status != ERR_NONE) {
+            return;
+        }
         
         if (parser->size >= parser->cap) {
             parser->cap *= 2;
@@ -224,6 +272,12 @@ void _free_ast(node_t* node) {
 
     _free_ast(node->left);
     _free_ast(node->right);
+    if (node->cap) {
+        for (int i = 0; i < node->size; i++) {
+            _free_ast(node->astList[i]);
+        }
+        free(node->astList);
+    }
     free(node);
 }
 

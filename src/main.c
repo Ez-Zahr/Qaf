@@ -2,13 +2,16 @@
 #include "../include/lexer.h"
 #include "../include/parser.h"
 #include "../include/compiler.h"
-#include "../include/transpiler.h"
+
+extern ERROR_STATUS err_status;
 
 int main(int argc, char* argv[]) {
     if (setlocale(LC_ALL, "ar_SA.utf8") == NULL) {
         wprintf(L"Failed to set locale\n");
         return 1;
     }
+
+    err_status = ERR_NONE;
 
     int _t = 0, _a = 0, _s = 0;
     char* filename = 0;
@@ -40,20 +43,26 @@ int main(int argc, char* argv[]) {
     
     read_src(filename, &src);
 
-    lex(&src, &lexer);
-    if (_t) {
-        print_tokens(&lexer);
+    if (err_status == ERR_NONE) {
+        lex(&src, &lexer);
+        if (_t) {
+            print_tokens(&lexer);
+        }
     }
 
-    parse(&lexer, &parser);
-    if (_a) {
-        print_parser(&parser);
+    if (err_status == ERR_NONE) {
+        parse(&lexer, &parser);
+        if (_a) {
+            print_parser(&parser);
+        }
     }
 
-    compile(&parser, _s);
+    if (err_status == ERR_NONE) {
+        compile(&parser, _s);
+    }
 
     free_parser(&parser);
     free_lexer(&lexer);
     free_src(&src);
-    return 0;
+    return err_status;
 }

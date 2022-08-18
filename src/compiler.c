@@ -1,9 +1,15 @@
 #include "../include/compiler.h"
 
+extern ERROR_STATUS err_status;
+
 void init_headers(sections_t* sections) {
     wchar_t* rodata = L".section .rodata\n";
     sections->rodata = (wchar_t*) calloc(wcslen(rodata) + 1, sizeof(wchar_t));
     wcscat(sections->rodata, rodata);
+
+    wchar_t* bss = L".section .bss\n";
+    sections->bss = (wchar_t*) calloc(wcslen(bss) + 1, sizeof(wchar_t));
+    wcscat(sections->bss, bss);
 
     wchar_t* text = L".section .text\n.globl _start\n_start:\n\tcallq _entry\n\tmovq %rax, %rdi\n\tmovq $60, %rax\n\tsyscall\n.globl _entry\n_entry:\n";
     sections->text = (wchar_t*) calloc(wcslen(text) + 1, sizeof(wchar_t));
@@ -30,6 +36,7 @@ void init_epilogue(sections_t* sections) {
 
 void free_sections(sections_t* sections) {
     free(sections->rodata);
+    free(sections->bss);
     free(sections->text);
 }
 
@@ -140,19 +147,22 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
     switch (ast->tok->type) {
         case TOK_PRINT: {
             instr_t* left = _compile(ast->left, context, sections);
+            if (err_status != ERR_NONE) {
+                return 0;
+            }
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
             switch (context->offsets->types[extract_offset(left->data) / 8 - 1]) {
                 case BIND_INT: {
                     size_t len = wcslen(left->data) + 36;
                     instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
-                    swprintf(instr->data, len, L"\tmovq %ls, %%r8\n\tcallq print_int\n", left->data);
+                    swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_int\n", left->data);
                     break;
                 }
                 case BIND_CHAR: {
                     size_t len = wcslen(left->data) + 36;
                     instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
-                    swprintf(instr->data, len, L"\tmovq %ls, %%r8\n\tcallq print_char\n", left->data);
+                    swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_char\n", left->data);
                     break;
                 }
                 case BIND_STR: {
@@ -163,9 +173,33 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
                 }
                 default: {
                     wprintf(L"Error: Undefined variable `%ls`\n", ast->left->tok->data);
-                    exit(1);
+                    err_status = ERR_COMPILE;
+                    free_instr(left);
+                    free_instr(instr);
+                    return 0;
                 }
             }
+            free_instr(left);
+            return instr;
+        }
+
+        case TOK_READ: {
+            instr_t* left = _compile(ast->left, context, sections);
+            if (err_status != ERR_NONE) {
+                return 0;
+            }
+            long offset = extract_offset(left->data);
+            context->offsets->types[offset / 8 - 1] = BIND_STR;
+            int bufnum = context->strings->size++;
+            bind_string(context, offset);
+            wchar_t buf[50];
+            swprintf(buf, 50, L"\tstr%d: .skip 80\n\t.equ len%d, 80\n", bufnum, bufnum);
+            sections->bss = (wchar_t*) realloc(sections->bss, (wcslen(sections->bss) + wcslen(buf) + 1) * sizeof(wchar_t));
+            wcscat(sections->bss, buf);
+            instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
+            instr->type = -1;
+            instr->data = (wchar_t*) calloc(56, sizeof(wchar_t));
+            swprintf(instr->data, 56, L"\tmovq $str%d, %%r8\n\tmovq $len%d, %%r9\n\tcallq read\n", bufnum, bufnum);
             free_instr(left);
             return instr;
         }
@@ -174,8 +208,8 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
             int offset = get_offset(context, ast->tok->data);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = INS_OFFSET;
-            instr->data = (wchar_t*) calloc(16, sizeof(wchar_t));
-            swprintf(instr->data, 16, L"\tpushq -%d(%%rbp)\n", offset);
+            instr->data = (wchar_t*) calloc(20, sizeof(wchar_t));
+            swprintf(instr->data, 20, L"\tpushq -%d(%%rbp)\n", offset);
             return instr;
         }
 
@@ -200,7 +234,7 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
             instr->data = (wchar_t*) calloc(16, sizeof(wchar_t));
-            swprintf(instr->data, 16, L"\tpushq $%d\n", wctob(ast->tok->data[0]));
+            swprintf(instr->data, 16, L"\tpushq $0x%x\n", ast->tok->data[0]);
             return instr;
         }
 
@@ -220,7 +254,14 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 
         case TOK_ASSIGN: {
             instr_t* left = _compile(ast->left, context, sections);
+            if (err_status != ERR_NONE) {
+                return 0;
+            }
             instr_t* right = _compile(ast->right, context, sections);
+            if (err_status != ERR_NONE) {
+                free_instr(left);
+                return 0;
+            }
             if (right->type == INS_STRING) {
                 bind_string(context, extract_offset(left->data));
             }
@@ -229,7 +270,7 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
             instr->type = -1;
             size_t len = wcslen(left->data) + wcslen(right->data) + 16;
             instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
-            swprintf(instr->data, len, L"%ls\tpopq %ls\n", right->data, wcschr(left->data, L' ') + 1);
+            swprintf(instr->data, len, L"%ls\tpopq %ls", right->data, wcschr(left->data, L'-'));
             free_instr(left);
             free_instr(right);
             return instr;
@@ -296,9 +337,17 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 
         case TOK_IF: {
             instr_t* left = _compile(ast->left, context, sections);
+            if (err_status != ERR_NONE) {
+                return 0;
+            }
             wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->right->size; i++) {
                 instr_t* ins = _compile(ast->right->astList[i], context, sections);
+                if (err_status != ERR_NONE) {
+                    free_instr(left);
+                    free(buf);
+                    return 0;
+                }
                 buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(ins->data) + 1) * sizeof(wchar_t));
                 wcscat(buf, ins->data);
                 free_instr(ins);
@@ -321,9 +370,17 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 
         case TOK_WHILE: {
             instr_t* left = _compile(ast->left, context, sections);
+            if (err_status != ERR_NONE) {
+                return 0;
+            }
             wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->right->size; i++) {
                 instr_t* ins = _compile(ast->right->astList[i], context, sections);
+                if (err_status != ERR_NONE) {
+                    free_instr(left);
+                    free(buf);
+                    return 0;
+                }
                 buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(ins->data) + 1) * sizeof(wchar_t));
                 wcscat(buf, ins->data);
                 free_instr(ins);
@@ -348,15 +405,41 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 
         case TOK_FOR: {
             instr_t* left = _compile(ast->left, context, sections);
+            if (err_status != ERR_NONE) {
+                return 0;
+            }
             context->offsets->types[extract_offset(left->data) / 8 - 1] = BIND_INT;
 
             instr_t* start = _compile(ast->right->astList[0], context, sections);
+            if (err_status != ERR_NONE) {
+                free_instr(left);
+                return 0;
+            }
             instr_t* end = _compile(ast->right->astList[1], context, sections);
+            if (err_status != ERR_NONE) {
+                free_instr(left);
+                free_instr(start);
+                return 0;
+            }
             instr_t* step = _compile(ast->right->astList[2], context, sections);
+            if (err_status != ERR_NONE) {
+                free_instr(left);
+                free_instr(start);
+                free_instr(end);
+                return 0;
+            }
 
             wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->size; i++) {
                 instr_t* ins = _compile(ast->astList[i], context, sections);
+                if (err_status != ERR_NONE) {
+                    free_instr(left);
+                    free_instr(start);
+                    free_instr(end);
+                    free_instr(step);
+                    free(buf);
+                    return 0;
+                }
                 buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(ins->data) + 1) * sizeof(wchar_t));
                 wcscat(buf, ins->data);
                 free_instr(ins);
@@ -385,14 +468,22 @@ instr_t* _compile(node_t* ast, context_t* context, sections_t* sections) {
 
         default: {
             wprintf(L"Error: Undefined compilation for `%ls`\n", tok_type_to_str(ast->tok->type));
-            exit(1);
+            err_status = ERR_COMPILE;
+            return 0;
         }
     }
 }
 
 instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, wchar_t* op) {
     instr_t* left = _compile(ast->left, context, sections);
+    if (err_status != ERR_NONE) {
+        return 0;
+    }
     instr_t* right = _compile(ast->right, context, sections);
+    if (err_status != ERR_NONE) {
+        free_instr(left);
+        return 0;
+    }
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
     instr->data = (wchar_t*) calloc(wcslen(left->data) + wcslen(right->data) + wcslen(op) + 1, sizeof(wchar_t));
@@ -406,6 +497,9 @@ instr_t* _compile_binary_instr(node_t* ast, context_t* context, sections_t* sect
 
 instr_t* _compile_unary_instr(node_t* ast, context_t* context, sections_t* sections, instr_type_t type, wchar_t* op) {
     instr_t* left = _compile(ast->left, context, sections);
+    if (err_status != ERR_NONE) {
+        return 0;
+    }
     instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
     instr->type = type;
     instr->data = (wchar_t*) calloc(wcslen(left->data) + wcslen(op) + 1, sizeof(wchar_t));
@@ -424,6 +518,12 @@ void compile(parser_t* parser, int _s) {
     wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
     for (int i = 0; i < parser->size; i++) {
         instr_t* instr = _compile(parser->astList[i], &context, &sections);
+        if (err_status != ERR_NONE) {
+            free(buf);
+            free_context(&context);
+            free_sections(&sections);
+            return;
+        }
         buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(instr->data) + 1) * sizeof(wchar_t));
         wcscat(buf, instr->data);
         free_instr(instr);
@@ -438,17 +538,20 @@ void compile(parser_t* parser, int _s) {
     FILE* output;
     if ((output = fopen("./a.s", "w")) == NULL) {
         wprintf(L"Could not open file ./a.s\n");
-        exit(1);
+        err_status = ERR_COMPILE;
+        free_context(&context);
+        free_sections(&sections);
+        return;
     }
     fputws(sections.rodata, output);
+    fputws(sections.bss, output);
     fputws(sections.text, output);
     fclose(output);
     
     if (!_s) {
-        system("as a.s include/asm/* -o a.o");
-        system("ld a.o -o a.out");
-        system("rm a.o");
-        system("rm a.s");
+        (void) (system("as a.s include/asm/* -o a.o") + 1);
+        (void) (system("ld a.o -o a.out") + 1);
+        (void) (system("rm a.s a.o") + 1);
     }
     
     free_context(&context);

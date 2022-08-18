@@ -5,6 +5,7 @@
 
 typedef enum {
     TOK_PRINT,
+    TOK_READ,
     TOK_ID,
 
     TOK_INT,

@@ -41,6 +41,7 @@ typedef struct {
 
 typedef struct {
     wchar_t* rodata;
+    wchar_t* bss;
     wchar_t* text;
     int labels;
 } sections_t;

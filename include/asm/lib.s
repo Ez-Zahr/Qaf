@@ -1,3 +1,14 @@
+read:
+    pushq %rbp
+    movq %rsp, %rbp
+    movq %r8, %rsi
+    movq %r9, %rdx
+    movq $0, %rax
+    movq $0, %rdi
+    syscall
+    leaveq
+    retq
+
 print:
     pushq %rbp
     movq %rsp, %rbp
