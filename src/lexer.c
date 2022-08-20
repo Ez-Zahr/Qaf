@@ -164,7 +164,8 @@ void lex(src_t* src, lexer_t* lexer) {
             tok->data[1] = L'\0';
             src->pos++;
 
-        } else if (src->buf[src->pos] == L'‘') {
+        }
+        /*else if (src->buf[src->pos] == L'‘') {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = TOK_CHAR;
             src->pos++;
@@ -182,7 +183,8 @@ void lex(src_t* src, lexer_t* lexer) {
             }
             src->pos++;
 
-        } else if (src->buf[src->pos] == L'"') {
+        }*/
+        else if (src->buf[src->pos] == L'"') {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = TOK_STR;
             src->pos++;

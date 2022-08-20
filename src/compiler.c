@@ -46,10 +46,6 @@ void init_context(context_t* context) {
     context->offsets->size = 0;
     context->offsets->arr = (wchar_t**) calloc(context->offsets->cap, sizeof(wchar_t*));
     context->offsets->types = (bind_type_t*) calloc(context->offsets->cap, sizeof(bind_type_t));
-    context->strings = (_strings_list_t*) calloc(1, sizeof(_strings_list_t));
-    context->strings->cap = 8;
-    context->strings->size = 0;
-    context->strings->arr = (int*) calloc(context->strings->cap, sizeof(int));
 }
 
 int get_offset(context_t* context, wchar_t* id) {
@@ -66,23 +62,6 @@ int get_offset(context_t* context, wchar_t* id) {
         context->offsets->arr = (wchar_t**) realloc(context->offsets->arr, context->offsets->cap * sizeof(wchar_t*));
     }
     return context->offsets->size * 8;
-}
-
-void bind_string(context_t* context, int offset) {
-    context->strings->arr[context->strings->size - 1] = offset;
-    if (context->strings->size >= context->strings->cap) {
-        context->strings->cap *= 2;
-        context->strings->arr = (int*) realloc(context->strings->arr, context->strings->cap * sizeof(int));
-    }
-}
-
-int get_string(context_t* context, int offset) {
-    for (int i = 0; i < context->strings->size; i++) {
-        if (context->strings->arr[i] == offset) {
-            return i;
-        }
-    }
-    return -1;
 }
 
 long extract_offset(wchar_t* offset) {
@@ -131,8 +110,6 @@ void free_context(context_t* context) {
     free(context->offsets->arr);
     free(context->offsets->types);
     free(context->offsets);
-    free(context->strings->arr);
-    free(context->strings);
 }
 
 void free_instr(instr_t* instr) {
@@ -152,10 +129,10 @@ instr_t* _compile(ast_t* ast, context_t* context, sections_t* sections) {
             }
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
+            size_t len = wcslen(left->data) + 36;
+            instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
             switch (context->offsets->types[extract_offset(left->data) / 8 - 1]) {
                 case BIND_INT: {
-                    size_t len = wcslen(left->data) + 36;
-                    instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
                     swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_int\n", left->data);
                     break;
                 }
@@ -166,9 +143,7 @@ instr_t* _compile(ast_t* ast, context_t* context, sections_t* sections) {
                     break;
                 }
                 case BIND_STR: {
-                    instr->data = (wchar_t*) calloc(64, sizeof(wchar_t));
-                    int string = get_string(context, extract_offset(left->data));
-                    swprintf(instr->data, 64, L"\tmovq $str%d, %%r8\n\tmovq $len%d, %%r9\n\tcallq print\n", string, string);
+                    swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_str\n", left->data);
                     break;
                 }
                 default: {
@@ -188,18 +163,17 @@ instr_t* _compile(ast_t* ast, context_t* context, sections_t* sections) {
             if (err_status != ERR_NONE) {
                 return 0;
             }
-            long offset = extract_offset(left->data);
-            context->offsets->types[offset / 8 - 1] = BIND_STR;
-            int bufnum = context->strings->size++;
-            bind_string(context, offset);
-            wchar_t buf[50];
-            swprintf(buf, 50, L"\tstr%d: .skip 80\n\t.equ len%d, 80\n", bufnum, bufnum);
+            context->offsets->types[extract_offset(left->data) / 8 - 1] = BIND_STR;
+            int bufnum = context->labels++;
+            wchar_t buf[20];
+            swprintf(buf, 20, L"\tstr%d: .skip 80\n", bufnum);
             sections->bss = (wchar_t*) realloc(sections->bss, (wcslen(sections->bss) + wcslen(buf) + 1) * sizeof(wchar_t));
             wcscat(sections->bss, buf);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            instr->data = (wchar_t*) calloc(56, sizeof(wchar_t));
-            swprintf(instr->data, 56, L"\tmovq $str%d, %%r8\n\tmovq $len%d, %%r9\n\tcallq read\n", bufnum, bufnum);
+            size_t len = wcslen(left->data) + 56;
+            instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
+            swprintf(instr->data, len, L"\tmovq $str%d, %%r8\n\tcallq read_line\n\tmovq $str%d, %ls\n", bufnum, bufnum, wcschr(left->data, L'-'));
             free_instr(left);
             return instr;
         }
@@ -239,16 +213,16 @@ instr_t* _compile(ast_t* ast, context_t* context, sections_t* sections) {
         }
 
         case TOK_STR: {
-            int strnum = context->strings->size++;
-            size_t len = wcslen(ast->tok->data) + 50;
+            int strnum = context->labels++;
+            size_t len = wcslen(ast->tok->data) + 32;
             wchar_t buf[len];
-            swprintf(buf, len, L"\tstr%d: .string \"%ls\"\n\t.equ len%d, .-str%d\n", strnum, ast->tok->data, strnum, strnum);
+            swprintf(buf, len, L"\tstr%d: .string \"%ls\"\n", strnum, ast->tok->data);
             sections->rodata = (wchar_t*) realloc(sections->rodata, (wcslen(sections->rodata) + wcslen(buf) + 1) * sizeof(wchar_t));
             wcscat(sections->rodata, buf);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
-            instr->type = INS_STRING;
-            instr->data = (wchar_t*) calloc(16, sizeof(wchar_t));
-            swprintf(instr->data, 16, L"\tpushq $str%d\n", strnum);
+            instr->type = -1;
+            instr->data = (wchar_t*) calloc(20, sizeof(wchar_t));
+            swprintf(instr->data, 20, L"\tpushq $str%d\n", strnum);
             return instr;
         }
 
@@ -261,9 +235,6 @@ instr_t* _compile(ast_t* ast, context_t* context, sections_t* sections) {
             if (err_status != ERR_NONE) {
                 free_instr(left);
                 return 0;
-            }
-            if (right->type == INS_STRING) {
-                bind_string(context, extract_offset(left->data));
             }
             context->offsets->types[extract_offset(left->data) / 8 - 1] = tok_to_bind_type(ast->right->tok->type);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));

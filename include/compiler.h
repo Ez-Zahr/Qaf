@@ -4,8 +4,7 @@
 #include "parser.h"
 
 typedef enum {
-    INS_OFFSET,
-    INS_STRING
+    INS_OFFSET
 } instr_type_t;
 
 typedef enum {
@@ -28,14 +27,7 @@ typedef struct {
 } _offsets_list_t;
 
 typedef struct {
-    int* arr;
-    int cap;
-    int size;
-} _strings_list_t;
-
-typedef struct {
     _offsets_list_t* offsets;
-    _strings_list_t* strings;
     int labels;
 } context_t;
 

@@ -1,32 +1,36 @@
-read:
+read_line:
     pushq %rbp
     movq %rsp, %rbp
+_read_line_loop:
     movq %r8, %rsi
-    movq %r9, %rdx
+    movq $1, %rdx
     movq $0, %rax
     movq $0, %rdi
     syscall
+    movzbq (%r8), %rbx
+    cmpq $10, %rbx
+    je _read_line_exit
+    addq $1, %r8
+    jmp _read_line_loop
+_read_line_exit:
     leaveq
     retq
 
-print:
+print_str:
     pushq %rbp
     movq %rsp, %rbp
+_print_str_loop:
+    movzbq (%r8), %rbx
+    cmpq $0, %rbx
+    je _print_str_exit
     movq %r8, %rsi
-    movq %r9, %rdx
+    movq $1, %rdx
     movq $1, %rax
     movq $1, %rdi
     syscall
-    leaveq
-    retq
-
-print_char:
-    pushq %rbp
-    movq %rsp, %rbp
-    pushq %r8
-    movq %rsp, %r8
-    movq $1, %r9
-    callq print
+    addq $1, %r8
+    jmp _print_str_loop
+_print_str_exit:
     leaveq
     retq
 
@@ -38,30 +42,40 @@ print_int:
     movq $0, -16(%rbp)
     movq %r8, %rax
     cmpq $0, %rax
-    jge _loop
+    jge _print_int_convert
     negq %rax
     pushq %rax
-    movq $45, %r8
-    callq print_char
+    pushq $45
+    movq %rsp, %rsi
+    movq $1, %rdx
+    movq $1, %rax
+    movq $1, %rdi
+    syscall
+    addq $8, %rsp
     popq %rax
-_loop:
+_print_int_convert:
     movq $0, %rdx
     idivq -8(%rbp)
     addq $48, %rdx
     pushq %rdx
     incq -16(%rbp)
     cmpq $0, %rax
-    jne _loop
-_print:
-    movq %rsp, %r8
-    movq $1, %r9
-    callq print
+    jne _print_int_convert
+_print_int_write:
+    movq %rsp, %rsi
+    movq $1, %rdx
+    movq $1, %rax
+    movq $1, %rdi
+    syscall
     addq $8, %rsp
     decq -16(%rbp)
     cmpq $0, -16(%rbp)
-    jg _print
-    movq $10, %r8
-    callq print_char
-_return:
+    jg _print_int_write
+    pushq $10
+    movq %rsp, %rsi
+    movq $1, %rdx
+    movq $1, %rax
+    movq $1, %rdi
+    syscall
     leaveq
     retq
