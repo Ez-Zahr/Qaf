@@ -12,7 +12,9 @@ int get_op_priority(tok_type_t op) {
     switch (op) {
         case TOK_ASSIGN:
             return PRI_ASSIGN;
-        
+        case TOK_AND:
+        case TOK_OR:
+            return PRI_LOGIC;
         case TOK_EQ:
         case TOK_NE:
         case TOK_LT:
@@ -20,20 +22,13 @@ int get_op_priority(tok_type_t op) {
         case TOK_GT:
         case TOK_GTE:
             return PRI_CMP;
-        
-        case TOK_AND:
-        case TOK_OR:
-            return PRI_AND_OR;
-        
         case TOK_PLUS:
         case TOK_MINUS:
-            return PRI_ADD_SUB;
-        
+            return PRI_TERM;
         case TOK_MUL:
         case TOK_DIV:
         case TOK_MOD:
-            return PRI_MUL_DIV;
-        
+            return PRI_FACTOR;
         default:
             return -1;
     }
@@ -48,6 +43,7 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
         case TOK_INT:
         case TOK_CHAR:
         case TOK_STR:
+        case TOK_READ:
         case TOK_ID: {
             ast_t* prim_node = (ast_t*) calloc(1, sizeof(ast_t));
             prim_node->tok = &lexer->tokens[lexer->pos++];
@@ -171,19 +167,6 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
             return expr;
         }
 
-        case TOK_READ: {
-            ast_t* expr = (ast_t*) calloc(1, sizeof(ast_t));
-            expr->tok = &lexer->tokens[lexer->pos++];
-            if (lexer->tokens[lexer->pos].type != TOK_ID) {
-                wprintf(L"Error: Expected an ID token after a READ token\n");
-                err_status = ERR_PARSE;
-                return expr;
-            }
-            expr->left = (ast_t*) calloc(1, sizeof(ast_t));
-            expr->left->tok = &lexer->tokens[lexer->pos++];
-            return expr;
-        }
-
         default: {
             token_t tok = lexer->tokens[lexer->pos];
             wprintf(L"Error: Invalid token `%ls` of type `%ls`\n", tok.data, tok_type_to_str(tok.type));
@@ -235,7 +218,7 @@ void parse(lexer_t* lexer, ast_t* root) {
 }
 
 void _print_ast(ast_t* node, int indent) {
-    if (node == NULL) {
+    if (!node) {
         return;
     }
 
@@ -262,7 +245,7 @@ void print_ast_root(ast_t* root) {
 }
 
 void free_ast(ast_t* ast) {
-    if (ast == NULL) {
+    if (!ast) {
         return;
     }
 

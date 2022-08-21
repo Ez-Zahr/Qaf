@@ -5,10 +5,10 @@
 
 typedef enum {
     PRI_ASSIGN,
-    PRI_AND_OR,
+    PRI_LOGIC,
     PRI_CMP,
-    PRI_ADD_SUB,
-    PRI_MUL_DIV,
+    PRI_TERM,
+    PRI_FACTOR,
     PRI_MAX
 } op_prior_t;
 

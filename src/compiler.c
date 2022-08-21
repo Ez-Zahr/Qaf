@@ -91,9 +91,8 @@ bind_type_t tok_to_bind_type(tok_type_t type) {
         case TOK_GT:
         case TOK_GTE:
             return BIND_BOOL;
-        case TOK_CHAR:
-            return BIND_CHAR;
         case TOK_STR:
+        case TOK_READ:
             return BIND_STR;
         default:
             return -1;
@@ -136,12 +135,6 @@ instr_t* _compile(ast_t* ast, context_t* context, sections_t* sections) {
                     swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_int\n", left->data);
                     break;
                 }
-                case BIND_CHAR: {
-                    size_t len = wcslen(left->data) + 36;
-                    instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
-                    swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_char\n", left->data);
-                    break;
-                }
                 case BIND_STR: {
                     swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_str\n", left->data);
                     break;
@@ -159,29 +152,22 @@ instr_t* _compile(ast_t* ast, context_t* context, sections_t* sections) {
         }
 
         case TOK_READ: {
-            instr_t* left = _compile(ast->left, context, sections);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
-            context->offsets->types[extract_offset(left->data) / 8 - 1] = BIND_STR;
             int bufnum = context->labels++;
             wchar_t buf[20];
-            swprintf(buf, 20, L"\tstr%d: .skip 80\n", bufnum);
+            swprintf(buf, 20, L"\tbuf%d: .skip 80\n", bufnum);
             sections->bss = (wchar_t*) realloc(sections->bss, (wcslen(sections->bss) + wcslen(buf) + 1) * sizeof(wchar_t));
             wcscat(sections->bss, buf);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
             instr->type = -1;
-            size_t len = wcslen(left->data) + 56;
-            instr->data = (wchar_t*) calloc(len, sizeof(wchar_t));
-            swprintf(instr->data, len, L"\tmovq $str%d, %%r8\n\tcallq read_line\n\tmovq $str%d, %ls\n", bufnum, bufnum, wcschr(left->data, L'-'));
-            free_instr(left);
+            instr->data = (wchar_t*) calloc(64, sizeof(wchar_t));
+            swprintf(instr->data, 64, L"\tmovq $buf%d, %%r8\n\tcallq read_line\n\tpushq $buf%d\n", bufnum, bufnum);
             return instr;
         }
 
         case TOK_ID: {
             int offset = get_offset(context, ast->tok->data);
             instr_t* instr = (instr_t*) calloc(1, sizeof(instr_t));
-            instr->type = INS_OFFSET;
+            instr->type = -1;
             instr->data = (wchar_t*) calloc(20, sizeof(wchar_t));
             swprintf(instr->data, 20, L"\tpushq -%d(%%rbp)\n", offset);
             return instr;

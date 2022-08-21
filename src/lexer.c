@@ -16,7 +16,7 @@ int isaralpha(wchar_t c) {
 tok_type_t get_keyword_type(wchar_t* keyword) {
     if (!wcscmp(keyword, L"اطبع")) {
         return TOK_PRINT;
-    } else if (!wcscmp(keyword, L"اقرأ")) {
+    } else if (!wcscmp(keyword, L"اقرأ_سطر")) {
         return TOK_READ;
     } else if (!wcscmp(keyword, L"صح") || !wcscmp(keyword, L"خطأ")) {
         return TOK_BOOL;

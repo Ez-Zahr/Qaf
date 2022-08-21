@@ -10,9 +10,10 @@ _read_line_loop:
     movzbq (%r8), %rbx
     cmpq $10, %rbx
     je _read_line_exit
-    addq $1, %r8
+    incq %r8
     jmp _read_line_loop
 _read_line_exit:
+    movb $0, (%r8)
     leaveq
     retq
 
@@ -28,9 +29,15 @@ _print_str_loop:
     movq $1, %rax
     movq $1, %rdi
     syscall
-    addq $1, %r8
+    incq %r8
     jmp _print_str_loop
 _print_str_exit:
+    pushq $10
+    movq %rsp, %rsi
+    movq $1, %rdx
+    movq $1, %rax
+    movq $1, %rdi
+    syscall
     leaveq
     retq
 
@@ -77,5 +84,21 @@ _print_int_write:
     movq $1, %rax
     movq $1, %rdi
     syscall
+    leaveq
+    retq
+
+copy_str:
+    pushq %rbp
+    movq %rsp, %rbp
+_copy_str_loop:
+    movzbq (%r8), %rbx
+    movb %bl, (%r9)
+    movzbq (%r8), %rbx
+    cmpq $0, %rbx
+    je _copy_str_exit
+    incq %r8
+    incq %r9
+    jmp _copy_str_loop
+_copy_str_exit:
     leaveq
     retq
