@@ -244,18 +244,25 @@ void print_ast_root(ast_t* root) {
     }
 }
 
-void free_ast(ast_t* ast) {
+void _free_ast(ast_t* ast) {
     if (!ast) {
         return;
     }
 
-    free_ast(ast->left);
-    free_ast(ast->right);
-    if (ast->cap) {
+    _free_ast(ast->left);
+    _free_ast(ast->right);
+    if (ast->list) {
         for (int i = 0; i < ast->size; i++) {
-            free_ast(ast->list[i]);
+            _free_ast(ast->list[i]);
         }
         free(ast->list);
     }
     free(ast);
+}
+
+void free_ast(ast_t* ast) {
+    for (int i = 0; i < ast->size; i++) {
+        _free_ast(ast->list[i]);
+    }
+    free(ast->list);
 }

@@ -14,5 +14,8 @@ ${EXE}: ${OBJ}
 %.o: %.c ${HDR}
 	${CC} ${CFLAGS} $< -o $@
 
+vgrind:
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -s ./${EXE} test/test.qaf -s
+
 clean:
 	rm src/*.o ${EXE} a.*

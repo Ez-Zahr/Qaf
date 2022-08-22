@@ -3,7 +3,7 @@
 extern ERROR_STATUS err_status;
 
 void init_headers(sections_t* sections) {
-    wchar_t* rodata = L".section .rodata\n";
+    wchar_t* rodata = L".section .rodata\n\tt: .string \"صح\"\n\tf: .string \"خطأ\"\n";
     sections->rodata = (wchar_t*) calloc(wcslen(rodata) + 1, sizeof(wchar_t));
     wcscat(sections->rodata, rodata);
 
@@ -46,6 +46,7 @@ void init_context(context_t* context) {
     context->offsets->size = 0;
     context->offsets->arr = (wchar_t**) calloc(context->offsets->cap, sizeof(wchar_t*));
     context->offsets->types = (bind_type_t*) calloc(context->offsets->cap, sizeof(bind_type_t));
+    context->labels = 0;
 }
 
 int get_offset(context_t* context, wchar_t* id) {
@@ -74,6 +75,7 @@ long extract_offset(wchar_t* offset) {
 bind_type_t tok_to_bind_type(tok_type_t type) {
     switch (type) {
         case TOK_INT:
+        case TOK_CHAR:
         case TOK_PLUS:
         case TOK_MINUS:
         case TOK_MUL:
@@ -133,6 +135,10 @@ instr_t* _compile(ast_t* ast, context_t* context, sections_t* sections) {
             switch (context->offsets->types[extract_offset(left->data) / 8 - 1]) {
                 case BIND_INT: {
                     swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_int\n", left->data);
+                    break;
+                }
+                case BIND_BOOL: {
+                    swprintf(instr->data, len, L"%ls\tpopq %%r8\n\tcallq print_bool\n", left->data);
                     break;
                 }
                 case BIND_STR: {

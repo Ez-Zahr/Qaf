@@ -87,6 +87,21 @@ _print_int_write:
     leaveq
     retq
 
+print_bool:
+    pushq %rbp
+    movq %rsp, %rbp
+    cmpq $0, %r8
+    je _print_bool_f
+    movq $t, %r8
+    callq print_str
+    jmp _print_bool_exit
+_print_bool_f:
+    movq $f, %r8
+    callq print_str
+_print_bool_exit:
+    leaveq
+    retq
+
 copy_str:
     pushq %rbp
     movq %rsp, %rbp

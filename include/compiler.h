@@ -10,7 +10,6 @@ typedef enum {
 typedef enum {
     BIND_INT,
     BIND_BOOL,
-    BIND_CHAR,
     BIND_STR
 } bind_type_t;
 
