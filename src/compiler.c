@@ -509,10 +509,11 @@ void compile(ast_t* root, int _s) {
     fputws(sections.rodata, output);
     fputws(sections.bss, output);
     fputws(sections.text, output);
+    fputws(L".include \"./include/asm/lib.s\"\n", output);
     fclose(output);
     
     if (!_s) {
-        (void) (system("as a.s include/asm/* -o a.o") + 1);
+        (void) (system("as a.s -o a.o") + 1);
         (void) (system("ld a.o -o a.out") + 1);
         (void) (system("rm a.s a.o") + 1);
     }
