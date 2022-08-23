@@ -3,9 +3,10 @@
 
 #include "util.h"
 
-typedef enum {
+typedef enum tok_type_t {
     TOK_PRINT,
     TOK_READ,
+    TOK_LET,
     TOK_ID,
 
     TOK_INT,
@@ -48,20 +49,19 @@ typedef enum {
     TOK_EOF
 } tok_type_t;
 
-typedef struct {
+typedef struct token_t {
     wchar_t* data;
     int len;
     tok_type_t type;
 } token_t;
 
-typedef struct {
+typedef struct lexer_t {
     token_t* tokens;
-    int cap;
     int size;
     int pos;
 } lexer_t;
 
-void init_lexer(lexer_t* lexer);
+lexer_t* init_lexer();
 void lex(src_t* src, lexer_t* lexer);
 wchar_t* tok_type_to_str(tok_type_t type);
 void print_tokens(lexer_t* lexer);

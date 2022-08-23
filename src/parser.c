@@ -2,10 +2,11 @@
 
 extern ERROR_STATUS err_status;
 
-void init_ast_list(ast_t* ast) {
-    ast->cap = 8;
+ast_t* init_ast_list() {
+    ast_t* ast = (ast_t*) calloc(1, sizeof(ast_t));
+    ast->list = (ast_t**) calloc(1, sizeof(ast_t*));
     ast->size = 0;
-    ast->list = (ast_t**) calloc(ast->cap, sizeof(ast_t*));
+    return ast;
 }
 
 int get_op_priority(tok_type_t op) {
@@ -50,6 +51,7 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
             return prim_node;
         }
 
+        case TOK_LET:
         case TOK_MINUS:
         case TOK_NOT: {
             ast_t* expr = (ast_t*) calloc(1, sizeof(ast_t));
@@ -121,10 +123,7 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
                 if (err_status != ERR_NONE) {
                     return exprList;
                 }
-                if (exprList->size >= exprList->cap) {
-                    exprList->cap *= 2;
-                    exprList->list = (ast_t**) realloc(exprList->list, exprList->cap * sizeof(ast_t*));
-                }
+                exprList->list = (ast_t**) realloc(exprList->list, (exprList->size + 1) * sizeof(ast_t*));
             }
             lexer->pos++;
             return exprList;
@@ -151,10 +150,7 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
                 if (err_status != ERR_NONE) {
                     return exprList;
                 }
-                if (exprList->size >= exprList->cap) {
-                    exprList->cap *= 2;
-                    exprList->list = (ast_t**) realloc(exprList->list, exprList->cap * sizeof(ast_t*));
-                }
+                exprList->list = (ast_t**) realloc(exprList->list, (exprList->size + 1) * sizeof(ast_t*));
             }
             lexer->pos++;
             return exprList;
@@ -210,10 +206,7 @@ void parse(lexer_t* lexer, ast_t* root) {
             return;
         }
         
-        if (root->size >= root->cap) {
-            root->cap *= 2;
-            root->list = (ast_t**) realloc(root->list, root->cap * sizeof(ast_t*));
-        }
+        root->list = (ast_t**) realloc(root->list, (root->size + 1) * sizeof(ast_t*));
     }
 }
 
@@ -231,17 +224,17 @@ void _print_ast(ast_t* node, int indent) {
     _print_ast(node->left, indent + 1);
     _print_ast(node->right, indent + 1);
 
-    if (node->cap > 0) {
-        for (int i = 0; i < node->size; i++) {
-            _print_ast(node->list[i], indent + 1);
-        }
+    for (int i = 0; i < node->size; i++) {
+        _print_ast(node->list[i], indent + 1);
     }
 }
 
-void print_ast_root(ast_t* root) {
-    for (int i = 0; i < root->size; i++) {
-        _print_ast(root->list[i], 0);
+void print_ast_list(ast_t* ast) {
+    wprintf(L"----------<AST>----------\n");
+    for (int i = 0; i < ast->size; i++) {
+        _print_ast(ast->list[i], 0);
     }
+    wprintf(L"-------------------------\n");
 }
 
 void _free_ast(ast_t* ast) {
@@ -252,17 +245,18 @@ void _free_ast(ast_t* ast) {
     _free_ast(ast->left);
     _free_ast(ast->right);
     if (ast->list) {
-        for (int i = 0; i < ast->size; i++) {
-            _free_ast(ast->list[i]);
-        }
-        free(ast->list);
+        free_ast_list(ast);
+        return;
     }
+
     free(ast);
 }
 
-void free_ast(ast_t* ast) {
+void free_ast_list(ast_t* ast) {
     for (int i = 0; i < ast->size; i++) {
         _free_ast(ast->list[i]);
     }
     free(ast->list);
+    free_scope(ast->scope);
+    free(ast);
 }

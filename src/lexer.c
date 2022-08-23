@@ -2,11 +2,12 @@
 
 extern ERROR_STATUS err_status;
 
-void init_lexer(lexer_t* lexer) {
-    lexer->cap = 64;
+lexer_t* init_lexer() {
+    lexer_t* lexer = (lexer_t*) calloc(1, sizeof(lexer_t));
+    lexer->tokens = (token_t*) calloc(1, sizeof(token_t));
     lexer->size = 0;
     lexer->pos = 0;
-    lexer->tokens = (token_t*) calloc(lexer->cap, sizeof(token_t));
+    return lexer;
 }
 
 int isaralpha(wchar_t c) {
@@ -26,6 +27,8 @@ tok_type_t get_keyword_type(wchar_t* keyword) {
         return TOK_AND;
     } else if (!wcscmp(keyword, L"ليس")) {
         return TOK_NOT;
+    } else if (!wcscmp(keyword, L"دع")) {
+        return TOK_LET;
     } else if (!wcscmp(keyword, L"إذا")) {
         return TOK_IF;
     } else if (!wcscmp(keyword, L"لكل")) {
@@ -217,13 +220,11 @@ void lex(src_t* src, lexer_t* lexer) {
             return;
         }
 
-        if (lexer->size >= lexer->cap) {
-            lexer->cap *= 2;
-            lexer->tokens = (token_t*) realloc(lexer->tokens, lexer->cap * sizeof(token_t));
-        }
+        lexer->tokens = (token_t*) realloc(lexer->tokens, (lexer->size + 1) * sizeof(token_t));
     }
 
     token_t* tok = &lexer->tokens[lexer->size++];
+    tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
     tok->type = TOK_EOF;
 }
 
@@ -231,6 +232,7 @@ wchar_t* tok_type_to_str(tok_type_t type) {
     switch (type) {
         case TOK_PRINT: return L"TOK_PRINT";
         case TOK_READ: return L"TOK_READ";
+        case TOK_LET: return L"TOK_LET";
         case TOK_ID: return L"TOK_ID";
         case TOK_INT: return L"TOK_INT";
         case TOK_FLOAT: return L"TOK_FLOAT";
@@ -270,14 +272,17 @@ wchar_t* tok_type_to_str(tok_type_t type) {
 }
 
 void print_tokens(lexer_t *lexer) {
+    wprintf(L"----------<Tokens>----------\n");
     for (int i = 0; i < lexer->size; i++) {
         wprintf(L"`%ls`, len %d, type `%ls`\n", lexer->tokens[i].data, lexer->tokens[i].len, tok_type_to_str(lexer->tokens[i].type));
     }
+    wprintf(L"----------------------------\n");
 }
 
 void free_lexer(lexer_t *lexer) {
-    for (int i = 0; i < lexer->cap; i++) {
+    for (int i = 0; i < lexer->size; i++) {
         free(lexer->tokens[i].data);
     }
     free(lexer->tokens);
+    free(lexer);
 }
