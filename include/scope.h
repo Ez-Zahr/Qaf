@@ -10,10 +10,12 @@ typedef enum var_type_t {
 } var_type_t;
 
 typedef struct scope_t {
-    wchar_t** vars;
+    wchar_t** ids;
     var_type_t* types;
+    int* depths;
     int size;
     struct scope_t* enclosing;
+    int cur_depth;
 } scope_t;
 
 scope_t* init_scope(scope_t* enclosing);

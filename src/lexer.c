@@ -19,6 +19,10 @@ tok_type_t get_keyword_type(wchar_t* keyword) {
         return TOK_PRINT;
     } else if (!wcscmp(keyword, L"اقرأ_سطر")) {
         return TOK_READ;
+    } else if (!wcscmp(keyword, L"دع")) {
+        return TOK_LET;
+    } else if (!wcscmp(keyword, L"دالة")) {
+        return TOK_FUNC;
     } else if (!wcscmp(keyword, L"صح") || !wcscmp(keyword, L"خطأ")) {
         return TOK_BOOL;
     } else if (!wcscmp(keyword, L"أو")) {
@@ -27,8 +31,6 @@ tok_type_t get_keyword_type(wchar_t* keyword) {
         return TOK_AND;
     } else if (!wcscmp(keyword, L"ليس")) {
         return TOK_NOT;
-    } else if (!wcscmp(keyword, L"دع")) {
-        return TOK_LET;
     } else if (!wcscmp(keyword, L"إذا")) {
         return TOK_IF;
     } else if (!wcscmp(keyword, L"لكل")) {
@@ -233,6 +235,7 @@ wchar_t* tok_type_to_str(tok_type_t type) {
         case TOK_PRINT: return L"TOK_PRINT";
         case TOK_READ: return L"TOK_READ";
         case TOK_LET: return L"TOK_LET";
+        case TOK_FUNC: return L"TOK_FUNC";
         case TOK_ID: return L"TOK_ID";
         case TOK_INT: return L"TOK_INT";
         case TOK_FLOAT: return L"TOK_FLOAT";

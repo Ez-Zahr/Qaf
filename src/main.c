@@ -55,19 +55,19 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    // if (err_status == ERR_NONE) {
-    //     compile(root, sections);
-    // }
+    if (err_status == ERR_NONE) {
+        compile(root, sections);
+    }
 
-    // if (err_status == ERR_NONE) {
-    //     write_asm(sections, "a.s");
-    // }
+    if (err_status == ERR_NONE) {
+        write_asm(sections, "a.s");
+    }
 
-    // if (err_status == ERR_NONE && !_s) {
-    //     (void) (system("as a.s -o a.o") + 1);
-    //     (void) (system("ld a.o -o a.out") + 1);
-    //     (void) (system("rm a.s a.o") + 1);
-    // }
+    if (err_status == ERR_NONE && !_s) {
+        (void) (system("as a.s -o a.o") + 1);
+        (void) (system("ld a.o -o a.out") + 1);
+        (void) (system("rm a.s a.o") + 1);
+    }
     
     free_sections(sections);
     free_ast_list(root);

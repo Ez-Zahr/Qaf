@@ -60,6 +60,23 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
             return expr;
         }
 
+        case TOK_FUNC: {
+            ast_t* expr = (ast_t*) calloc(1, sizeof(ast_t));
+            expr->list = (ast_t**) calloc(3, sizeof(ast_t*));
+            expr->size = 3;
+            expr->tok = &lexer->tokens[lexer->pos++];
+            expr->list[0] = parse_primary_expr(lexer);
+            if (err_status != ERR_NONE) {
+                return expr;
+            }
+            expr->list[1] = parse_primary_expr(lexer);
+            if (err_status != ERR_NONE) {
+                return expr;
+            }
+            expr->list[2] = parse_primary_expr(lexer);
+            return expr;
+        }
+
         case TOK_IF: 
         case TOK_WHILE: {
             ast_t* expr = (ast_t*) calloc(1, sizeof(ast_t));
@@ -68,58 +85,65 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
             if (err_status != ERR_NONE) {
                 return expr;
             }
+            if (expr->left->size != 1) {
+                wprintf(L"Error: Invalid number of arguments inside the condition parentheses\n");
+                err_status = ERR_PARSE;
+                return expr;
+            }
             expr->right = parse_primary_expr(lexer);
             return expr;
         }
 
         case TOK_FOR: {
-            token_t* tok = &lexer->tokens[lexer->pos++];
-            ast_t* left = parse_primary_expr(lexer);
+            ast_t* expr = (ast_t*) calloc(1, sizeof(ast_t));
+            expr->list = (ast_t**) calloc(3, sizeof(ast_t*));
+            expr->size = 3;
+            expr->tok = &lexer->tokens[lexer->pos++];
+            expr->list[0] = parse_primary_expr(lexer);
             if (err_status != ERR_NONE) {
-                return left;
+                return expr;
             }
             lexer->pos++;
-            ast_t* right = parse_primary_expr(lexer);
+            expr->list[1] = parse_primary_expr(lexer);
             if (err_status != ERR_NONE) {
-                left->right = right;
-                return left;
+                return expr;
             }
-            ast_t* expr = parse_primary_expr(lexer);
-            expr->tok = tok;
-            expr->left = left;
-            expr->right = right;
+            if (expr->list[1]->size != 3) {
+                wprintf(L"Error: Invalid number of arguments inside the for-loop brackets\n");
+                err_status = ERR_PARSE;
+                return expr;
+            }
+            expr->list[2] = parse_primary_expr(lexer);
             return expr;
         }
 
         case TOK_LPAREN: {
-            lexer->pos++;
-            ast_t* expr = _parse(lexer, 1);
-            if (err_status != ERR_NONE) {
-                return expr;
+            ast_t* exprList = init_ast_list();
+            exprList->tok = &lexer->tokens[lexer->pos++];
+            while (lexer->tokens[lexer->pos].type != TOK_RPAREN) {
+                if (lexer->tokens[lexer->pos].type == TOK_COMMA) {
+                    lexer->pos++;
+                    continue;
+                }
+                exprList->list[exprList->size++] = _parse(lexer, PRI_ASSIGN + 1);
+                if (err_status != ERR_NONE) {
+                    return exprList;
+                }
+                exprList->list = (ast_t**) realloc(exprList->list, (exprList->size + 1) * sizeof(ast_t*));
             }
-            if (lexer->tokens[lexer->pos].type != TOK_RPAREN) {
-                wprintf(L"Error: Missing closing parenthesis\n");
-                err_status = ERR_PARSE;
-                return expr;
-            }
             lexer->pos++;
-            return expr;
+            return exprList;
         }
 
         case TOK_LBRACE: {
-            ast_t* exprList = (ast_t*) calloc(1, sizeof(ast_t));
+            ast_t* exprList = init_ast_list();
             exprList->tok = &lexer->tokens[lexer->pos++];
-            init_ast_list(exprList);
             while (lexer->tokens[lexer->pos].type != TOK_RBRACE) {
                 if (lexer->tokens[lexer->pos].type == TOK_SEMI) {
                     lexer->pos++;
                     continue;
-                } else if (lexer->tokens[lexer->pos].type == TOK_EOF) {
-                    wprintf(L"Error: Missing closing brace\n");
-                    err_status = ERR_PARSE;
-                    return exprList;
                 }
-                exprList->list[exprList->size++] = _parse(lexer, 0);
+                exprList->list[exprList->size++] = _parse(lexer, PRI_ASSIGN);
                 if (err_status != ERR_NONE) {
                     return exprList;
                 }
@@ -130,21 +154,12 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
         }
 
         case TOK_LBRACK: {
-            ast_t* exprList = (ast_t*) calloc(1, sizeof(ast_t));
+            ast_t* exprList = init_ast_list();
             exprList->tok = &lexer->tokens[lexer->pos++];
-            init_ast_list(exprList);
             while (lexer->tokens[lexer->pos].type != TOK_RBRACK) {
                 if (lexer->tokens[lexer->pos].type == TOK_COLON) {
                     lexer->pos++;
                     continue;
-                } else if (lexer->tokens[lexer->pos].type == TOK_SEMI) {
-                    wprintf(L"Error: Invalid semicolon\n");
-                    err_status = ERR_PARSE;
-                    return exprList;
-                } else if (lexer->tokens[lexer->pos].type == TOK_EOF) {
-                    wprintf(L"Error: Missing closing bracket\n");
-                    err_status = ERR_PARSE;
-                    return exprList;
                 }
                 exprList->list[exprList->size++] = parse_primary_expr(lexer);
                 if (err_status != ERR_NONE) {
@@ -159,7 +174,7 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
         case TOK_PRINT: {
             ast_t* expr = (ast_t*) calloc(1, sizeof(ast_t));
             expr->tok = &lexer->tokens[lexer->pos++];
-            expr->left = _parse(lexer, 1);
+            expr->left = _parse(lexer, PRI_ASSIGN + 1);
             return expr;
         }
 
@@ -201,7 +216,7 @@ void parse(lexer_t* lexer, ast_t* root) {
             break;
         }
 
-        root->list[root->size++] = _parse(lexer, 0);
+        root->list[root->size++] = _parse(lexer, PRI_ASSIGN);
         if (err_status != ERR_NONE) {
             return;
         }

@@ -6,7 +6,9 @@
 typedef enum tok_type_t {
     TOK_PRINT,
     TOK_READ,
+
     TOK_LET,
+    TOK_FUNC,
     TOK_ID,
 
     TOK_INT,
@@ -44,6 +46,7 @@ typedef enum tok_type_t {
     TOK_RBRACE,
     TOK_LBRACK,
     TOK_RBRACK,
+    TOK_COMMA,
     TOK_COLON,
     TOK_SEMI,
     TOK_EOF

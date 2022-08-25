@@ -31,6 +31,7 @@ typedef struct sections_t {
     wchar_t* rodata;
     wchar_t* bss;
     wchar_t* text;
+    wchar_t* funcs;
     wchar_t* include;
     int labels;
 } sections_t;

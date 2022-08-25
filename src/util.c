@@ -71,9 +71,11 @@ sections_t* init_sections() {
     sections->bss = (wchar_t*) calloc(wcslen(bss) + 1, sizeof(wchar_t));
     wcscat(sections->bss, bss);
 
-    wchar_t* text = L".section .text\n.globl _start\n_start:\n\tcallq _entry\n\tmovq %rax, %rdi\n\tmovq $60, %rax\n\tsyscall\n.globl _entry\n_entry:\n";
+    wchar_t* text = L".section .text\n.globl _start\n_start:\n\tcallq _entry\n\tmovq %rax, %rdi\n\tmovq $60, %rax\n\tsyscall\n_entry:\n";
     sections->text = (wchar_t*) calloc(wcslen(text) + 1, sizeof(wchar_t));
     wcscat(sections->text, text);
+
+    sections->funcs = (wchar_t*) calloc(1, sizeof(wchar_t));
 
     wchar_t* include = L".include \"./include/asm/lib.s\"\n";
     sections->include = (wchar_t*) calloc(wcslen(include) + 1, sizeof(wchar_t));
@@ -92,6 +94,7 @@ void write_asm(sections_t* sections, char* filename) {
     fputws(sections->rodata, output);
     fputws(sections->bss, output);
     fputws(sections->text, output);
+    fputws(sections->funcs, output);
     fputws(sections->include, output);
     fclose(output);
 }
@@ -100,6 +103,7 @@ void free_sections(sections_t* sections) {
     free(sections->rodata);
     free(sections->bss);
     free(sections->text);
+    free(sections->funcs);
     free(sections->include);
     free(sections);
 }
