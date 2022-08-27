@@ -37,11 +37,12 @@ long extract_offset(wchar_t* offset) {
 
 wchar_t* _compile_binary_instr(ast_t* ast, scope_t* scope, sections_t* sections, wchar_t* op);
 wchar_t* _compile_unary_instr(ast_t* ast, scope_t* scope, sections_t* sections, wchar_t* op);
+wchar_t* _compile_list(ast_t* ast, scope_t* scope, sections_t* sections);
 
-wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
+wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
     switch (ast->tok->type) {
         case TOK_PRINT: {
-            wchar_t* left = _compile(ast->left, scope, sections);
+            wchar_t* left = _compile_ast(ast->left, scope, sections);
             if (err_status != ERR_NONE) {
                 return 0;
             }
@@ -98,11 +99,15 @@ wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
         case TOK_ID: {
             int offset = get_var(scope, ast->tok->data);
             if (offset == -1) {
-                wprintf(L"Error: Undefined variable `%ls`\n", ast->tok->data);
+                wprintf(L"Error: Undefined reference `%ls`\n", ast->tok->data);
                 err_status = ERR_COMPILE;
                 return 0;
             }
             wchar_t* instr = (wchar_t*) calloc(24, sizeof(wchar_t));
+            if (ast->left) {
+                swprintf(instr, 24, L"\tcallq func%d\n", offset);
+                return instr;
+            }
             swprintf(instr, 24, L"\tpushq -%d(%%rbp)\n", (offset + 1) * 8);
             return instr;
         }
@@ -139,11 +144,11 @@ wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_ASSIGN: {
-            wchar_t* left = _compile(ast->left, scope, sections);
+            wchar_t* left = _compile_ast(ast->left, scope, sections);
             if (err_status != ERR_NONE) {
                 return 0;
             }
-            wchar_t* right = _compile(ast->right, scope, sections);
+            wchar_t* right = _compile_ast(ast->right, scope, sections);
             if (err_status != ERR_NONE) {
                 free(left);
                 return 0;
@@ -217,11 +222,11 @@ wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_IF: {
-            wchar_t* left = _compile(ast->left->list[0], scope, sections);
+            wchar_t* left = _compile_ast(ast->left->list[0], scope, sections);
             if (err_status != ERR_NONE) {
                 return 0;
             }
-            wchar_t* block = _compile(ast->right, scope, sections);
+            wchar_t* block = _compile_ast(ast->right, scope, sections);
             if (err_status != ERR_NONE) {
                 free(left);
                 return 0;
@@ -238,11 +243,11 @@ wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_WHILE: {
-            wchar_t* left = _compile(ast->left->list[0], scope, sections);
+            wchar_t* left = _compile_ast(ast->left->list[0], scope, sections);
             if (err_status != ERR_NONE) {
                 return 0;
             }
-            wchar_t* block = _compile(ast->right, scope, sections);
+            wchar_t* block = _compile_ast(ast->right, scope, sections);
             if (err_status != ERR_NONE) {
                 free(left);
                 return 0;
@@ -261,49 +266,40 @@ wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_FOR: {
-            wchar_t* start = _compile(ast->list[1]->list[0], scope, sections);
+            scope->cur_depth++;
+            int offset = add_var(scope, ast->list[0]->tok->data);
+            scope->cur_depth--;
+            scope->types[offset] = VAR_INT;
+            offset = (offset + 1) * 8;
+            wchar_t* start = _compile_ast(ast->list[1]->list[0], scope, sections);
             if (err_status != ERR_NONE) {
                 return 0;
             }
-            wchar_t* end = _compile(ast->list[1]->list[1], scope, sections);
+            wchar_t* end = _compile_ast(ast->list[1]->list[1], scope, sections);
             if (err_status != ERR_NONE) {
                 free(start);
                 return 0;
             }
-            wchar_t* step = _compile(ast->list[1]->list[2], scope, sections);
-            if (err_status != ERR_NONE) {
-                free(start);
-                free(end);
-                return 0;
-            }
-
-            wchar_t* block = _compile(ast->list[2], scope, sections);
+            wchar_t* step = _compile_ast(ast->list[1]->list[2], scope, sections);
             if (err_status != ERR_NONE) {
                 free(start);
                 free(end);
-                free(step);
                 return 0;
             }
-            
-            wchar_t* left = _compile(ast->list[0], scope, sections);
+            wchar_t* block = _compile_ast(ast->list[2], scope, sections);
             if (err_status != ERR_NONE) {
                 free(start);
                 free(end);
                 free(step);
-                free(block);
                 return 0;
             }
-            scope->types[extract_offset(left) / 8 - 1] = VAR_INT;
-
-            wchar_t* format = L"%ls\tpopq %ls\n%ls:\n%ls\tpopq %%rax\n\tcmpq %%rax, %ls\n\t%ls %ls\n%ls%ls\tpopq %%rax\n\taddq %%rax, %ls\n\tjmp %ls\n%ls:\n";
-            wchar_t* jmp = (ast->list[1]->list[2]->tok->type == TOK_MINUS)? L"jl" : L"jg";
+            wchar_t* format = L"%ls\tpopq -%d(%%rbp)\n%ls:\n%ls\tpopq %%rax\n\tcmpq %%rax, -%d(%%rbp)\n\t%ls %ls\n%ls%ls\tpopq %%rax\n\taddq %%rax, -%d(%%rbp)\n\tjmp %ls\n%ls:\n";
+            wchar_t* jmp = (ast->list[1]->list[2]->tok->type == TOK_MINUS)? L"jle" : L"jge";
             wchar_t* l1 = get_label(sections);
             wchar_t* l2 = get_label(sections);
-            size_t len = wcslen(format) + wcslen(left) * 3 + wcslen(block) + wcslen(start) + wcslen(end) + wcslen(step) + wcslen(l1) * 2 + wcslen(l2) * 2 + 2;
+            size_t len = wcslen(format) + wcslen(block) + wcslen(start) + wcslen(end) + wcslen(step) + wcslen(l1) * 2 + wcslen(l2) * 2 + 16;
             wchar_t* instr = (wchar_t*) calloc(len + 1, sizeof(wchar_t));
-            swprintf(instr, len, format, start, left, l1, end, left, jmp, l2, block, step, left, l1, l2);
-
-            free(left);
+            swprintf(instr, len, format, start, offset, l1, end, offset, jmp, l2, block, step, offset, l1, l2);
             free(start);
             free(end);
             free(step);
@@ -314,10 +310,6 @@ wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_FUNC: {
-            // wprintf(L"%ls %d\n", tok_type_to_str(ast->tok->type), ast->size);
-            // for (int i = 0; i < ast->size; i++) {
-            //     wprintf(L"%ls\n", tok_type_to_str(ast->list[i]->tok->type));
-            // }
             int offset = add_var(scope, ast->list[0]->tok->data);
             if (offset == -1) {
                 wprintf(L"Error: Duplicate definition for `%ls`\n", ast->list[0]->tok->data);
@@ -333,41 +325,35 @@ wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
                     return 0;
                 }
             }
-            new_scope->cur_depth--;
-            wchar_t* body = _compile(ast->list[2], new_scope, sections);
+            wchar_t* block = _compile_list(ast->list[2], new_scope, sections);
             if (err_status != ERR_NONE) {
                 return 0;
             }
-            new_scope->cur_depth++;
-            wchar_t* pro = init_prologue(new_scope->size);
-            wchar_t* epi = init_epilogue();
-            size_t len = wcslen(pro) + wcslen(body) + wcslen(epi) + 24;
+            size_t len = wcslen(block) + 24;
             wchar_t* func = (wchar_t*) calloc(len, sizeof(wchar_t));
-            swprintf(func, len, L"func%d:\n%ls%ls%ls", offset, pro, body, epi);
+            swprintf(func, len, L"func%d:\n%ls", offset, block);
             sections->funcs = (wchar_t*) realloc(sections->funcs, (wcslen(sections->funcs) + wcslen(func) + 1) * sizeof(wchar_t));
             wcscat(sections->funcs, func);
-            free(pro);
-            free(body);
-            free(epi);
+            free(block);
             free(func);
             return (wchar_t*) calloc(1, sizeof(wchar_t));
         }
 
         case TOK_LBRACE: {
             scope->cur_depth++;
-            wchar_t* buf = (wchar_t*) calloc(1, sizeof(wchar_t));
+            wchar_t* block = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->size; i++) {
-                wchar_t* instr = _compile(ast->list[i], scope, sections);
+                wchar_t* instr = _compile_ast(ast->list[i], scope, sections);
                 if (err_status != ERR_NONE) {
-                    free(buf);
+                    free(block);
                     return 0;
                 }
-                buf = (wchar_t*) realloc(buf, (wcslen(buf) + wcslen(instr) + 1) * sizeof(wchar_t));
-                wcscat(buf, instr);
+                block = (wchar_t*) realloc(block, (wcslen(block) + wcslen(instr) + 1) * sizeof(wchar_t));
+                wcscat(block, instr);
                 free(instr);
             }
-            scope->cur_depth--;
-            return buf;
+            pop_cur_depth(scope);
+            return block;
         }
 
         default: {
@@ -379,11 +365,11 @@ wchar_t* _compile(ast_t* ast, scope_t* scope, sections_t* sections) {
 }
 
 wchar_t* _compile_binary_instr(ast_t* ast, scope_t* scope, sections_t* sections, wchar_t* op) {
-    wchar_t* left = _compile(ast->left, scope, sections);
+    wchar_t* left = _compile_ast(ast->left, scope, sections);
     if (err_status != ERR_NONE) {
         return 0;
     }
-    wchar_t* right = _compile(ast->right, scope, sections);
+    wchar_t* right = _compile_ast(ast->right, scope, sections);
     if (err_status != ERR_NONE) {
         free(left);
         return 0;
@@ -398,7 +384,7 @@ wchar_t* _compile_binary_instr(ast_t* ast, scope_t* scope, sections_t* sections,
 }
 
 wchar_t* _compile_unary_instr(ast_t* ast, scope_t* scope, sections_t* sections, wchar_t* op) {
-    wchar_t* left = _compile(ast->left, scope, sections);
+    wchar_t* left = _compile_ast(ast->left, scope, sections);
     if (err_status != ERR_NONE) {
         return 0;
     }
@@ -409,28 +395,37 @@ wchar_t* _compile_unary_instr(ast_t* ast, scope_t* scope, sections_t* sections, 
     return instr;
 }
 
-void compile(ast_t* root, sections_t* sections) {
-    root->scope = init_scope(0);
+wchar_t* _compile_list(ast_t* ast, scope_t* scope, sections_t* sections) {
+    ast->scope = scope;
 
     wchar_t* body = (wchar_t*) calloc(1, sizeof(wchar_t));
-    for (int i = 0; i < root->size; i++) {
-        wchar_t* instr = _compile(root->list[i], root->scope, sections);
+    for (int i = 0; i < ast->size; i++) {
+        wchar_t* instr = _compile_ast(ast->list[i], scope, sections);
         if (err_status != ERR_NONE) {
             free(body);
-            return;
+            return 0;
         }
         body = (wchar_t*) realloc(body, (wcslen(body) + wcslen(instr) + 1) * sizeof(wchar_t));
         wcscat(body, instr);
         free(instr);
     }
     
-    wchar_t* pro = init_prologue(root->scope->size);
+    wchar_t* pro = init_prologue(ast->scope->size);
     wchar_t* epi = init_epilogue();
-    sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(pro) + wcslen(body) + wcslen(epi) + 1) * sizeof(wchar_t));
-    wcscat(sections->text, pro);
-    wcscat(sections->text, body);
-    wcscat(sections->text, epi);
-    free(pro);
+    pro = (wchar_t*) realloc(pro, (wcslen(pro) + wcslen(pro) + wcslen(body) + wcslen(epi) + 1) * sizeof(wchar_t));
+    wcscat(pro, body);
+    wcscat(pro, epi);
     free(body);
     free(epi);
+    return pro;
+}
+
+void compile(ast_t* root, sections_t* sections) {
+    wchar_t* buf = _compile_list(root, init_scope(0), sections);
+    if (err_status != ERR_NONE) {
+        return;
+    }
+    sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(buf) + 1) * sizeof(wchar_t));
+    wcscat(sections->text, buf);
+    free(buf);
 }

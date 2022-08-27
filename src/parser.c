@@ -44,10 +44,18 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
         case TOK_INT:
         case TOK_CHAR:
         case TOK_STR:
-        case TOK_READ:
+        case TOK_READ: {
+            ast_t* prim_node = (ast_t*) calloc(1, sizeof(ast_t));
+            prim_node->tok = &lexer->tokens[lexer->pos++];
+            return prim_node;
+        }
+
         case TOK_ID: {
             ast_t* prim_node = (ast_t*) calloc(1, sizeof(ast_t));
             prim_node->tok = &lexer->tokens[lexer->pos++];
+            if (lexer->tokens[lexer->pos].type == TOK_LPAREN) {
+                prim_node->left = parse_primary_expr(lexer);
+            }
             return prim_node;
         }
 
@@ -65,10 +73,8 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
             expr->list = (ast_t**) calloc(3, sizeof(ast_t*));
             expr->size = 3;
             expr->tok = &lexer->tokens[lexer->pos++];
-            expr->list[0] = parse_primary_expr(lexer);
-            if (err_status != ERR_NONE) {
-                return expr;
-            }
+            expr->list[0] = (ast_t*) calloc(1, sizeof(ast_t));
+            expr->list[0]->tok = &lexer->tokens[lexer->pos++];
             expr->list[1] = parse_primary_expr(lexer);
             if (err_status != ERR_NONE) {
                 return expr;
