@@ -104,7 +104,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
             }
             wchar_t* instr = (wchar_t*) calloc(24, sizeof(wchar_t));
             if (ast->left) {
-                if (ast->left->size != scope->nargs[offset]) {
+                if (ast->left->size != get_func_argc(scope, offset)) {
                     wprintf(L"Error: Invalid number of arguments for `%ls`\n", ast->tok->data);
                     err_status = ERR_COMPILE;
                     free(instr);
@@ -334,7 +334,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
                 return 0;
             }
             ast_t* args = ast->list[1];
-            scope->nargs[offset] = args->size;
+            set_func_argc(scope, offset, args->size);
             ast_t* block = ast->list[2];
             block->scope = init_scope(scope);
             wchar_t* func_args = (wchar_t*) calloc(1, sizeof(wchar_t));
