@@ -11,7 +11,7 @@ lexer_t* init_lexer() {
 }
 
 int isaralpha(wchar_t c) {
-    return (0x600 <= c && c <= 0x6ff && c != L'؛');
+    return (0x600 <= c && c <= 0x6ff && c != L'؛' && c != L'،');
 }
 
 tok_type_t get_keyword_type(wchar_t* keyword) {
@@ -83,7 +83,7 @@ tok_type_t get_op_type(wchar_t* op) {
 
 int issymbol(wchar_t c) {
     switch (c) {
-        case L'؛': case L'(': case L')': case L'{': case L'}': case L'[': case L']': case L':': return 1; default: return 0;
+        case L'؛': case L'(': case L')': case L'{': case L'}': case L'[': case L']': case L':': case L'،': return 1; default: return 0;
     }
 }
 
@@ -97,6 +97,7 @@ tok_type_t get_symbol_type(wchar_t c) {
         case L'[': return TOK_LBRACK;
         case L']': return TOK_RBRACK;
         case L':': return TOK_COLON;
+        case L'،': return TOK_COMMA;
         default: return -1;
     }
 }
@@ -268,6 +269,7 @@ wchar_t* tok_type_to_str(tok_type_t type) {
         case TOK_LBRACK: return L"TOK_LBRACK";
         case TOK_RBRACK: return L"TOK_RBRACK";
         case TOK_COLON: return L"TOK_COLON";
+        case TOK_COMMA: return L"TOK_COMMA";
         case TOK_SEMI: return L"TOK_SEMI";
         case TOK_EOF: return L"TOK_EOF";
         default: return L"Undefined type string";

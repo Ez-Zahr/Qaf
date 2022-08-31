@@ -37,7 +37,6 @@ long extract_offset(wchar_t* offset) {
 
 wchar_t* _compile_binary_instr(ast_t* ast, scope_t* scope, sections_t* sections, wchar_t* op);
 wchar_t* _compile_unary_instr(ast_t* ast, scope_t* scope, sections_t* sections, wchar_t* op);
-wchar_t* _compile_list(ast_t* ast, scope_t* scope, sections_t* sections);
 
 wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
     switch (ast->tok->type) {
@@ -48,7 +47,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
             }
             size_t len = wcslen(left) + 36;
             wchar_t* instr = (wchar_t*) calloc(len, sizeof(wchar_t));
-            switch (scope->types[extract_offset(left) / 8 - 1]) {
+            switch (get_var_type(scope, extract_offset(left) / 8 - 1)) {
                 case VAR_INT: {
                     swprintf(instr, len, L"%ls\tpopq %%r8\n\tcallq print_int\n", left);
                     break;
@@ -105,7 +104,25 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
             }
             wchar_t* instr = (wchar_t*) calloc(24, sizeof(wchar_t));
             if (ast->left) {
-                swprintf(instr, 24, L"\tcallq func%d\n", offset);
+                if (ast->left->size != scope->nargs[offset]) {
+                    wprintf(L"Error: Invalid number of arguments for `%ls`\n", ast->tok->data);
+                    err_status = ERR_COMPILE;
+                    free(instr);
+                    return 0;
+                }
+                if (ast->left->size) {
+                    wchar_t* args = _compile_ast(ast->left, scope, sections);
+                    if (err_status != ERR_NONE) {
+                        free(instr);
+                        return 0;
+                    }
+                    size_t len = wcslen(args) + 48;
+                    instr = (wchar_t*) realloc(instr, len * sizeof(wchar_t));
+                    swprintf(instr, len, L"%ls\tcallq func%d\n\taddq $%d, %%rsp\n", args, offset, ast->left->size * 8);
+                    free(args);
+                } else {
+                    swprintf(instr, 24, L"\tcallq func%d\n", offset);
+                }
                 return instr;
             }
             swprintf(instr, 24, L"\tpushq -%d(%%rbp)\n", (offset + 1) * 8);
@@ -153,7 +170,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
                 free(left);
                 return 0;
             }
-            scope->types[extract_offset(left) / 8 - 1] = VAR_INT;
+            set_var_type(scope, extract_offset(left) / 8 - 1, VAR_INT);
             size_t len = wcslen(left) + wcslen(right) + 16;
             wchar_t* instr = (wchar_t*) calloc(len, sizeof(wchar_t));
             swprintf(instr, len, L"%ls\tpopq %ls", right, wcschr(left, L'-'));
@@ -269,7 +286,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
             scope->cur_depth++;
             int offset = add_var(scope, ast->list[0]->tok->data);
             scope->cur_depth--;
-            scope->types[offset] = VAR_INT;
+            set_var_type(scope, offset, VAR_INT);
             offset = (offset + 1) * 8;
             wchar_t* start = _compile_ast(ast->list[1]->list[0], scope, sections);
             if (err_status != ERR_NONE) {
@@ -316,25 +333,45 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
                 err_status = ERR_COMPILE;
                 return 0;
             }
-            scope_t* new_scope = init_scope(scope);
             ast_t* args = ast->list[1];
+            scope->nargs[offset] = args->size;
+            ast_t* block = ast->list[2];
+            block->scope = init_scope(scope);
+            wchar_t* func_args = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < args->size; i++) {
-                if (args->list[i]->tok->type != TOK_ID || add_var(new_scope, args->list[i]->tok->data) == -1) {
+                if (args->list[i]->tok->type != TOK_ID || add_var(block->scope, args->list[i]->tok->data) == -1) {
                     wprintf(L"Error: Invalid function definition for `%ls`\n", ast->list[0]->tok->data);
                     err_status = ERR_COMPILE;
                     return 0;
                 }
+                wchar_t* arg_init = (wchar_t*) calloc(64, sizeof(wchar_t));
+                swprintf(arg_init, 64, L"\tpushq %d(%%rbp)\n", i * 8 + 16);
+                func_args = (wchar_t*) realloc(func_args, (wcslen(func_args) + 64) * sizeof(wchar_t));
+                wcscat(func_args, arg_init);
+                free(arg_init);
             }
-            wchar_t* block = _compile_list(ast->list[2], new_scope, sections);
-            if (err_status != ERR_NONE) {
-                return 0;
+            wchar_t* body = (wchar_t*) calloc(1, sizeof(wchar_t));
+            for (int i = 0; i < block->size; i++) {
+                wchar_t* instr = _compile_ast(block->list[i], block->scope, sections);
+                if (err_status != ERR_NONE) {
+                    free(body);
+                    return 0;
+                }
+                body = (wchar_t*) realloc(body, (wcslen(body) + wcslen(instr) + 1) * sizeof(wchar_t));
+                wcscat(body, instr);
+                free(instr);
             }
-            size_t len = wcslen(block) + 24;
+            wchar_t* pro = init_prologue(block->scope->size);
+            wchar_t* epi = init_epilogue();
+            size_t len = wcslen(pro) + wcslen(func_args) + wcslen(body) + wcslen(epi) + 24;
             wchar_t* func = (wchar_t*) calloc(len, sizeof(wchar_t));
-            swprintf(func, len, L"func%d:\n%ls", offset, block);
+            swprintf(func, len, L"func%d:\n%ls%ls%ls%ls", offset, pro, func_args, body, epi);
             sections->funcs = (wchar_t*) realloc(sections->funcs, (wcslen(sections->funcs) + wcslen(func) + 1) * sizeof(wchar_t));
             wcscat(sections->funcs, func);
-            free(block);
+            free(pro);
+            free(func_args);
+            free(body);
+            free(epi);
             free(func);
             return (wchar_t*) calloc(1, sizeof(wchar_t));
         }
@@ -354,6 +391,21 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
             }
             pop_cur_depth(scope);
             return block;
+        }
+
+        case TOK_LPAREN: {
+            wchar_t* args = (wchar_t*) calloc(1, sizeof(wchar_t));
+            for (int i = ast->size - 1; i >= 0; i--) {
+                wchar_t* arg = _compile_ast(ast->list[i], scope, sections);
+                if (err_status != ERR_NONE) {
+                    free(args);
+                    return 0;
+                }
+                args = (wchar_t*) realloc(args, (wcslen(args) + wcslen(arg) + 1) * sizeof(wchar_t));
+                wcscat(args, arg);
+                free(arg);
+            }
+            return args;
         }
 
         default: {
@@ -395,37 +447,26 @@ wchar_t* _compile_unary_instr(ast_t* ast, scope_t* scope, sections_t* sections, 
     return instr;
 }
 
-wchar_t* _compile_list(ast_t* ast, scope_t* scope, sections_t* sections) {
-    ast->scope = scope;
-
+void compile(ast_t* root, sections_t* sections) {
+    root->scope = init_scope(0);
     wchar_t* body = (wchar_t*) calloc(1, sizeof(wchar_t));
-    for (int i = 0; i < ast->size; i++) {
-        wchar_t* instr = _compile_ast(ast->list[i], scope, sections);
+    for (int i = 0; i < root->size; i++) {
+        wchar_t* instr = _compile_ast(root->list[i], root->scope, sections);
         if (err_status != ERR_NONE) {
             free(body);
-            return 0;
+            return;
         }
         body = (wchar_t*) realloc(body, (wcslen(body) + wcslen(instr) + 1) * sizeof(wchar_t));
         wcscat(body, instr);
         free(instr);
     }
-    
-    wchar_t* pro = init_prologue(ast->scope->size);
+    wchar_t* pro = init_prologue(root->scope->size);
     wchar_t* epi = init_epilogue();
-    pro = (wchar_t*) realloc(pro, (wcslen(pro) + wcslen(pro) + wcslen(body) + wcslen(epi) + 1) * sizeof(wchar_t));
-    wcscat(pro, body);
-    wcscat(pro, epi);
+    sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(pro) + wcslen(body) + wcslen(epi) + 1) * sizeof(wchar_t));
+    wcscat(sections->text, pro);
+    wcscat(sections->text, body);
+    wcscat(sections->text, epi);
+    free(pro);
     free(body);
     free(epi);
-    return pro;
-}
-
-void compile(ast_t* root, sections_t* sections) {
-    wchar_t* buf = _compile_list(root, init_scope(0), sections);
-    if (err_status != ERR_NONE) {
-        return;
-    }
-    sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(buf) + 1) * sizeof(wchar_t));
-    wcscat(sections->text, buf);
-    free(buf);
 }
