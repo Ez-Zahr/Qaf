@@ -96,7 +96,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_ID: {
-            int offset = get_var(scope, ast->tok->data);
+            int offset = get_var_offset(scope, ast->tok->data);
             if (offset == -1) {
                 wprintf(L"Error: Undefined reference `%ls`\n", ast->tok->data);
                 err_status = ERR_COMPILE;
@@ -283,9 +283,9 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_FOR: {
-            scope->cur_depth++;
+            push_scope(scope);
             int offset = add_var(scope, ast->list[0]->tok->data);
-            scope->cur_depth--;
+            pop_scope(scope);
             set_var_type(scope, offset, VAR_INT);
             offset = (offset + 1) * 8;
             wchar_t* start = _compile_ast(ast->list[1]->list[0], scope, sections);
@@ -361,7 +361,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
                 wcscat(body, instr);
                 free(instr);
             }
-            wchar_t* pro = init_prologue(block->scope->size);
+            wchar_t* pro = init_prologue(get_scope_size(block->scope));
             wchar_t* epi = init_epilogue();
             size_t len = wcslen(pro) + wcslen(func_args) + wcslen(body) + wcslen(epi) + 24;
             wchar_t* func = (wchar_t*) calloc(len, sizeof(wchar_t));
@@ -377,7 +377,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_LBRACE: {
-            scope->cur_depth++;
+            push_scope(scope);
             wchar_t* block = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->size; i++) {
                 wchar_t* instr = _compile_ast(ast->list[i], scope, sections);
@@ -389,7 +389,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
                 wcscat(block, instr);
                 free(instr);
             }
-            pop_cur_depth(scope);
+            pop_depth(scope);
             return block;
         }
 
@@ -460,7 +460,7 @@ void compile(ast_t* root, sections_t* sections) {
         wcscat(body, instr);
         free(instr);
     }
-    wchar_t* pro = init_prologue(root->scope->size);
+    wchar_t* pro = init_prologue(get_scope_size(root->scope));
     wchar_t* epi = init_epilogue();
     sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(pro) + wcslen(body) + wcslen(epi) + 1) * sizeof(wchar_t));
     wcscat(sections->text, pro);

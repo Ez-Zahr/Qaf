@@ -2,7 +2,7 @@
 
 scope_t* init_scope(scope_t* enclosing) {
     scope_t* scope = (scope_t*) calloc(1, sizeof(scope_t));
-    scope->vars = (wchar_t**) calloc(1, sizeof(wchar_t*));
+    scope->vars = (wchar_t***) calloc(1, sizeof(wchar_t**));
     scope->types = (var_type_t*) calloc(1, sizeof(var_type_t));
     scope->nargs = (int*) calloc(1, sizeof(int));
     scope->depths = (int*) calloc(1, sizeof(int));
@@ -28,7 +28,8 @@ int add_var(scope_t* scope, wchar_t* var) {
     return scope->size - 1;
 }
 
-int get_var(scope_t* scope, wchar_t* var) {
+int get_var_offset(scope_t* scope, wchar_t* var) {
+    int offset = 0;
     for (int depth = scope->cur_depth; depth >= 0; depth--) {
         for (int i = 0; i < scope->size; i++) {
             if (!wcscmp(scope->vars[i], var) && scope->depths[i] == depth) {
@@ -55,13 +56,20 @@ int get_func_argc(scope_t* scope, int offset) {
     return scope->nargs[offset];
 }
 
-void pop_cur_depth(scope_t* scope) {
+void push_depth(scope_t* scope) {
+    scope->cur_depth++;
+}
+
+void pop_depth(scope_t* scope) {
     for (int i = 0; i < scope->size; i++) {
         if (scope->depths[i] == scope->cur_depth) {
             scope->depths[i] = -1;
         }
     }
     scope->cur_depth--;
+}
+
+int get_scope_size(scope_t* scope) {
 }
 
 void free_scope(scope_t* scope) {
