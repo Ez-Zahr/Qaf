@@ -71,7 +71,7 @@ sections_t* init_sections() {
     sections->bss = (wchar_t*) calloc(wcslen(bss) + 1, sizeof(wchar_t));
     wcscat(sections->bss, bss);
 
-    wchar_t* text = L".section .text\n.globl _start\n_start:\n\tcallq _entry\n\tmovq %rax, %rdi\n\tmovq $60, %rax\n\tsyscall\n_entry:\n";
+    wchar_t* text = L".section .text\n.globl _start\n_start:\n\tcallq _entry\n\tmovq $0, %rdi\n\tmovq $60, %rax\n\tsyscall\n_entry:\n";
     sections->text = (wchar_t*) calloc(wcslen(text) + 1, sizeof(wchar_t));
     wcscat(sections->text, text);
 

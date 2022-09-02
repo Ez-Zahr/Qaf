@@ -2,24 +2,18 @@
 
 extern ERROR_STATUS err_status;
 
-wchar_t* init_prologue(int stack_alloc) {
-    wchar_t* prologue;
-
-    if (stack_alloc) {
-        prologue = (wchar_t*) calloc(64, sizeof(wchar_t));
-        swprintf(prologue, 64, L"\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n\tsubq $%d, %%rsp\n", stack_alloc * 8);
-    } else {
-        prologue = (wchar_t*) calloc(32, sizeof(wchar_t));
-        wcscat(prologue, L"\tpushq %rbp\n\tmovq %rsp, %rbp\n");
-    }
-
-    return prologue;
+wchar_t* init_prologue() {
+    return L"\tpushq %rbp\n\tmovq %rsp, %rbp\n";
+    // wchar_t* prologue = (wchar_t*) calloc(32, sizeof(wchar_t));
+    // wcscat(prologue, L"\tpushq %rbp\n\tmovq %rsp, %rbp\n");
+    // return prologue;
 }
 
 wchar_t* init_epilogue() {
-    wchar_t* epilogue = (wchar_t*) calloc(32, sizeof(wchar_t));
-    wcscat(epilogue, L"\tmovq $0, %rax\n\tleaveq\n\tretq\n");
-    return epilogue;
+    return L"\tleaveq\n\tretq\n";
+    // wchar_t* epilogue = (wchar_t*) calloc(32, sizeof(wchar_t));
+    // wcscat(epilogue, L"\tmovq $0, %rax\n\tleaveq\n\tretq\n");
+    // return epilogue;
 }
 
 wchar_t* get_label(sections_t* sections) {
@@ -74,8 +68,8 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
 
         case TOK_READ: {
             int bufnum = sections->labels++;
-            wchar_t buf[20];
-            swprintf(buf, 20, L"\tbuf%d: .skip 80\n", bufnum);
+            wchar_t buf[24];
+            swprintf(buf, 24, L"\tbuf%d: .skip 80\n", bufnum);
             sections->bss = (wchar_t*) realloc(sections->bss, (wcslen(sections->bss) + wcslen(buf) + 1) * sizeof(wchar_t));
             wcscat(sections->bss, buf);
             wchar_t* instr = (wchar_t*) calloc(64, sizeof(wchar_t));
@@ -84,7 +78,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_LET: {
-            int offset = add_var(scope, ast->left->tok->data);
+            int offset = add_var(scope, ast->left->tok->data, scope->depth);
             if (offset == -1) {
                 wprintf(L"Error: Duplicate definition for `%ls`\n", ast->left->tok->data);
                 err_status = ERR_COMPILE;
@@ -96,37 +90,33 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_ID: {
-            int offset = get_var_offset(scope, ast->tok->data);
-            if (offset == -1) {
-                wprintf(L"Error: Undefined reference `%ls`\n", ast->tok->data);
-                err_status = ERR_COMPILE;
-                return 0;
-            }
-            wchar_t* instr = (wchar_t*) calloc(24, sizeof(wchar_t));
             if (ast->left) {
-                if (ast->left->size != get_func_argc(scope, offset)) {
-                    wprintf(L"Error: Invalid number of arguments for `%ls`\n", ast->tok->data);
+                int offset = get_func_offset(scope, ast->tok->data);
+                if (offset == -1 || ast->left->size != get_func_argc(scope, offset)) {
+                    wprintf(L"Error: Invalid function call `%ls`\n", ast->tok->data);
                     err_status = ERR_COMPILE;
-                    free(instr);
                     return 0;
                 }
-                if (ast->left->size) {
-                    wchar_t* args = _compile_ast(ast->left, scope, sections);
-                    if (err_status != ERR_NONE) {
-                        free(instr);
-                        return 0;
-                    }
-                    size_t len = wcslen(args) + 48;
-                    instr = (wchar_t*) realloc(instr, len * sizeof(wchar_t));
-                    swprintf(instr, len, L"%ls\tcallq func%d\n\taddq $%d, %%rsp\n", args, offset, ast->left->size * 8);
-                    free(args);
-                } else {
-                    swprintf(instr, 24, L"\tcallq func%d\n", offset);
+                wchar_t* args = _compile_ast(ast->left, scope, sections);
+                if (err_status != ERR_NONE) {
+                    return 0;
                 }
+                size_t len = wcslen(args) + 48;
+                wchar_t* instr = (wchar_t*) calloc(len, sizeof(wchar_t));
+                swprintf(instr, len, L"%ls\tcallq func%d\n\taddq $%d, %%rsp\n", args, offset, ast->left->size * 8);
+                free(args);
+                return instr;
+            } else {
+                int offset = get_var_offset(scope, ast->tok->data);
+                if (offset == -1) {
+                    wprintf(L"Error: Undefined reference `%ls`\n", ast->tok->data);
+                    err_status = ERR_COMPILE;
+                    return 0;
+                }
+                wchar_t* instr = (wchar_t*) calloc(24, sizeof(wchar_t));
+                swprintf(instr, 24, L"\tpushq -%d(%%rbp)\n", (offset + 1) * 8);
                 return instr;
             }
-            swprintf(instr, 24, L"\tpushq -%d(%%rbp)\n", (offset + 1) * 8);
-            return instr;
         }
 
         case TOK_INT: {
@@ -283,9 +273,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_FOR: {
-            push_scope(scope);
-            int offset = add_var(scope, ast->list[0]->tok->data);
-            pop_scope(scope);
+            int offset = add_var(scope, ast->list[0]->tok->data, scope->depth + 1);
             set_var_type(scope, offset, VAR_INT);
             offset = (offset + 1) * 8;
             wchar_t* start = _compile_ast(ast->list[1]->list[0], scope, sections);
@@ -327,7 +315,7 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
         }
 
         case TOK_FUNC: {
-            int offset = add_var(scope, ast->list[0]->tok->data);
+            int offset = add_func(scope, ast->list[0]->tok->data);
             if (offset == -1) {
                 wprintf(L"Error: Duplicate definition for `%ls`\n", ast->list[0]->tok->data);
                 err_status = ERR_COMPILE;
@@ -339,16 +327,15 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
             block->scope = init_scope(scope);
             wchar_t* func_args = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < args->size; i++) {
-                if (args->list[i]->tok->type != TOK_ID || add_var(block->scope, args->list[i]->tok->data) == -1) {
+                if (args->list[i]->tok->type != TOK_ID || add_arg(block->scope, args->list[i]->tok->data) == -1) {
                     wprintf(L"Error: Invalid function definition for `%ls`\n", ast->list[0]->tok->data);
                     err_status = ERR_COMPILE;
                     return 0;
                 }
-                wchar_t* arg_init = (wchar_t*) calloc(64, sizeof(wchar_t));
+                wchar_t arg_init[64];
                 swprintf(arg_init, 64, L"\tpushq %d(%%rbp)\n", i * 8 + 16);
                 func_args = (wchar_t*) realloc(func_args, (wcslen(func_args) + 64) * sizeof(wchar_t));
                 wcscat(func_args, arg_init);
-                free(arg_init);
             }
             wchar_t* body = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < block->size; i++) {
@@ -361,23 +348,21 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
                 wcscat(body, instr);
                 free(instr);
             }
-            wchar_t* pro = init_prologue(get_scope_size(block->scope));
+            wchar_t* pro = init_prologue();
             wchar_t* epi = init_epilogue();
-            size_t len = wcslen(pro) + wcslen(func_args) + wcslen(body) + wcslen(epi) + 24;
+            size_t len = wcslen(pro) + wcslen(func_args) + wcslen(body) + wcslen(epi) + 48;
             wchar_t* func = (wchar_t*) calloc(len, sizeof(wchar_t));
-            swprintf(func, len, L"func%d:\n%ls%ls%ls%ls", offset, pro, func_args, body, epi);
+            swprintf(func, len, L"func%d:\n%ls%ls\tsubq $%d, %%rsp\n%ls%ls", offset, pro, func_args, block->scope->vars_size * 8, body, epi);
             sections->funcs = (wchar_t*) realloc(sections->funcs, (wcslen(sections->funcs) + wcslen(func) + 1) * sizeof(wchar_t));
             wcscat(sections->funcs, func);
-            free(pro);
             free(func_args);
             free(body);
-            free(epi);
             free(func);
             return (wchar_t*) calloc(1, sizeof(wchar_t));
         }
 
         case TOK_LBRACE: {
-            push_scope(scope);
+            push_depth(scope);
             wchar_t* block = (wchar_t*) calloc(1, sizeof(wchar_t));
             for (int i = 0; i < ast->size; i++) {
                 wchar_t* instr = _compile_ast(ast->list[i], scope, sections);
@@ -460,13 +445,12 @@ void compile(ast_t* root, sections_t* sections) {
         wcscat(body, instr);
         free(instr);
     }
-    wchar_t* pro = init_prologue(get_scope_size(root->scope));
+    wchar_t* pro = init_prologue();
     wchar_t* epi = init_epilogue();
-    sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(pro) + wcslen(body) + wcslen(epi) + 1) * sizeof(wchar_t));
-    wcscat(sections->text, pro);
-    wcscat(sections->text, body);
-    wcscat(sections->text, epi);
-    free(pro);
+    size_t len = wcslen(pro) + wcslen(body) + wcslen(epi) + 32;
+    wchar_t buf[len];
+    swprintf(buf, len, L"%ls\tsubq $%d, %%rsp\n%ls%ls", pro, root->scope->vars_size * 8, body, epi);
+    sections->text = (wchar_t*) realloc(sections->text, (wcslen(sections->text) + wcslen(buf) + 1) * sizeof(wchar_t));
+    wcscat(sections->text, buf);
     free(body);
-    free(epi);
 }
