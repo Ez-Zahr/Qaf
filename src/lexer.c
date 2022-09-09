@@ -11,7 +11,16 @@ lexer_t* init_lexer() {
 }
 
 int isaralpha(wchar_t c) {
-    return (0x600 <= c && c <= 0x6ff && c != L'؛' && c != L'،');
+    switch (c) {
+        case L'ء': case L'آ': case L'أ': case L'ؤ': case L'إ': case L'ئ':
+        case L'ا': case L'ب': case L'ة': case L'ت': case L'ث': case L'ج':
+        case L'ح': case L'خ': case L'د': case L'ذ': case L'ر': case L'ز':
+        case L'س': case L'ش': case L'ص': case L'ض': case L'ط': case L'ظ':
+        case L'ع': case L'غ': case L'ف': case L'ق': case L'ك': case L'ل':
+        case L'م': case L'ن': case L'ه': case L'و': case L'ى': case L'ي':
+            return 1;
+        default: return 0;
+    }
 }
 
 tok_type_t get_keyword_type(wchar_t* keyword) {
@@ -98,7 +107,11 @@ tok_type_t get_symbol_type(wchar_t c) {
         case L']': return TOK_RBRACK;
         case L':': return TOK_COLON;
         case L'،': return TOK_COMMA;
-        default: return -1;
+        default: {
+            wprintf(L"Error: Undefined symbol type for `%lc`\n", c);
+            err_status = ERR_LEX;
+            return -1;
+        }
     }
 }
 

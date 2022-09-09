@@ -4,16 +4,10 @@ extern ERROR_STATUS err_status;
 
 wchar_t* init_prologue() {
     return L"\tpushq %rbp\n\tmovq %rsp, %rbp\n";
-    // wchar_t* prologue = (wchar_t*) calloc(32, sizeof(wchar_t));
-    // wcscat(prologue, L"\tpushq %rbp\n\tmovq %rsp, %rbp\n");
-    // return prologue;
 }
 
 wchar_t* init_epilogue() {
     return L"\tleaveq\n\tretq\n";
-    // wchar_t* epilogue = (wchar_t*) calloc(32, sizeof(wchar_t));
-    // wcscat(epilogue, L"\tmovq $0, %rax\n\tleaveq\n\tretq\n");
-    // return epilogue;
 }
 
 wchar_t* get_label(sections_t* sections) {
@@ -24,9 +18,8 @@ wchar_t* get_label(sections_t* sections) {
 
 long extract_offset(wchar_t* offset) {
     wchar_t* start = wcschr(offset, L'-') + 1;
-    wchar_t buf[32] = {};
-    wcsncpy(buf, start, wcschr(start, L'(') - start);
-    return wcstol(buf, 0, 10);
+    wchar_t* end = wcschr(start, L'(');
+    return wcstol(start, &end, 10);
 }
 
 wchar_t* _compile_binary_instr(ast_t* ast, scope_t* scope, sections_t* sections, wchar_t* op);
