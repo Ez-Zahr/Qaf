@@ -1,16 +1,17 @@
 #include "../include/scope.h"
 
 scope_t* init_scope(scope_t* enclosing) {
-    scope_t* scope = (scope_t*) calloc(1, sizeof(scope_t));
-    scope->vars = (wchar_t**) calloc(1, sizeof(wchar_t*));
-    scope->vars_types = (var_type_t*) calloc(1, sizeof(var_type_t));
-    scope->vars_depths = (int*) calloc(1, sizeof(int));
+    scope_t* scope = (scope_t*) smart_alloc(1, sizeof(scope_t));
+    scope->vars = (wchar_t**) smart_alloc(1, sizeof(wchar_t*));
+    scope->vars_types = (var_type_t*) smart_alloc(1, sizeof(var_type_t));
+    scope->vars_depths = (int*) smart_alloc(1, sizeof(int));
     scope->vars_size = 0;
     scope->depth = 0;
-    scope->args = (wchar_t**) calloc(1, sizeof(wchar_t*));
+    scope->args = (wchar_t**) smart_alloc(1, sizeof(wchar_t*));
+    scope->args_types = (var_type_t*) smart_alloc(1, sizeof(var_type_t));
     scope->args_size = 0;
-    scope->funcs = (wchar_t**) calloc(1, sizeof(wchar_t*));
-    scope->funcs_argc = (int*) calloc(1, sizeof(int));
+    scope->funcs = (wchar_t**) smart_alloc(1, sizeof(wchar_t*));
+    scope->funcs_argc = (int*) smart_alloc(1, sizeof(int));
     scope->funcs_size = 0;
     scope->enclosing = enclosing;
     return scope;
@@ -25,13 +26,14 @@ int add_var(scope_t* scope, wchar_t* var, int depth) {
     scope->vars[scope->vars_size] = var;
     scope->vars_types[scope->vars_size] = -1;
     scope->vars_depths[scope->vars_size++] = depth;
-    scope->vars = (wchar_t**) realloc(scope->vars, (scope->vars_size + 1) * sizeof(wchar_t*));
-    scope->vars_types = (var_type_t*) realloc(scope->vars_types, (scope->vars_size + 1) * sizeof(var_type_t));
-    scope->vars_depths = (int*) realloc(scope->vars_depths, (scope->vars_size + 1) * sizeof(int));
+    scope->vars = (wchar_t**) smart_realloc(scope->vars, scope->vars_size + 1, sizeof(wchar_t*));
+    scope->vars_types = (var_type_t*) smart_realloc(scope->vars_types, scope->vars_size + 1, sizeof(var_type_t));
+    scope->vars_depths = (int*) smart_realloc(scope->vars_depths, scope->vars_size + 1, sizeof(int));
     return scope->args_size + scope->vars_size - 1;
 }
 
 int get_var_offset(scope_t* scope, wchar_t* var) {
+    if (!scope) return -1;
     for (int depth = scope->depth; depth >= 0; depth--) {
         for (int i = scope->vars_size - 1; i >= 0; i--) {
             if (!wcscmp(scope->vars[i], var) && scope->vars_depths[i] == depth) {
@@ -44,7 +46,7 @@ int get_var_offset(scope_t* scope, wchar_t* var) {
             return i;
         }
     }
-    return -1;
+    return get_var_offset(scope->enclosing, var);
 }
 
 void set_var_type(scope_t* scope, int offset, var_type_t type) {
@@ -60,7 +62,7 @@ int add_arg(scope_t* scope, wchar_t* arg) {
         return -1;
     }
     scope->args[scope->args_size++] = arg;
-    scope->args = (wchar_t**) realloc(scope->args, (scope->args_size + 1) * sizeof(wchar_t*));
+    scope->args = (wchar_t**) smart_realloc(scope->args, scope->args_size + 1, sizeof(wchar_t*));
     return scope->args_size - 1;
 }
 
@@ -78,7 +80,7 @@ int add_func(scope_t* scope, wchar_t* func) {
         return -1;
     }
     scope->funcs[scope->funcs_size++] = func;
-    scope->funcs = (wchar_t**) realloc(scope->funcs, (scope->funcs_size + 1) * sizeof(wchar_t*));
+    scope->funcs = (wchar_t**) smart_realloc(scope->funcs, scope->funcs_size + 1, sizeof(wchar_t*));
     return scope->funcs_size - 1;
 }
 
@@ -110,17 +112,4 @@ void pop_depth(scope_t* scope) {
         }
     }
     scope->depth--;
-}
-
-void free_scope(scope_t* scope) {
-    if (!scope) {
-        return;
-    }
-    free(scope->vars);
-    free(scope->vars_types);
-    free(scope->vars_depths);
-    free(scope->args);
-    free(scope->funcs);
-    free(scope->funcs_argc);
-    free(scope);
 }

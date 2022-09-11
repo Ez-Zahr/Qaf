@@ -10,6 +10,7 @@
 
 typedef enum ERROR_STATUS {
     ERR_NONE,
+    ERR_MAIN,
     ERR_SRC,
     ERR_LEX,
     ERR_PARSE,
@@ -18,7 +19,10 @@ typedef enum ERROR_STATUS {
     ERR_EVAL
 } ERROR_STATUS;
 
-ERROR_STATUS err_status;
+typedef struct allocs_t {
+    void** list;
+    int size;
+} allocs_t;
 
 typedef struct src_t {
     char* filename;
@@ -39,12 +43,16 @@ typedef struct sections_t {
 wchar_t* wcsrev(wchar_t* str);
 int endsWith(const char *str, const char *suffix);
 
+void init_allocs();
+void* smart_alloc(int n, int size);
+void* smart_realloc(void* ptr, int n, int size);
+void free_allocs();
+void smart_exit(ERROR_STATUS status);
+
 src_t* init_src();
 void read_src(char* filename, src_t* src);
-void free_src(src_t* src);
 
 sections_t* init_sections();
 void write_asm(sections_t* sections, char* filename);
-void free_sections(sections_t* sections);
 
 #endif

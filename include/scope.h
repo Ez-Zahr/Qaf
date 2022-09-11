@@ -16,6 +16,7 @@ typedef struct scope_t {
     int vars_size;
     int depth;
     wchar_t** args;
+    var_type_t* args_types;
     int args_size;
     wchar_t** funcs;
     int* funcs_argc;
@@ -36,6 +37,5 @@ void set_func_argc(scope_t* scope, int offset, int argc);
 int get_func_argc(scope_t* scope, int offset);
 void push_depth(scope_t* scope);
 void pop_depth(scope_t* scope);
-void free_scope(scope_t* scope);
 
 #endif

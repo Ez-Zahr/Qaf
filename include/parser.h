@@ -25,6 +25,5 @@ typedef struct ast_t {
 ast_t* init_ast_list();
 void parse(lexer_t* lexer, ast_t* root);
 void print_ast_list(ast_t* ast);
-void free_ast_list(ast_t* ast);
 
 #endif

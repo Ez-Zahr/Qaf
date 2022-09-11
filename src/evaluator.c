@@ -1,7 +1,5 @@
 #include "../include/evaluator.h"
 
-extern ERROR_STATUS err_status;
-
 int eval(ast_t* ast) {
     switch (ast->tok->type) {
         case TOK_INT: {
@@ -22,63 +20,42 @@ int eval(ast_t* ast) {
         
         case TOK_PLUS: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left + right;
         }
         
         case TOK_MINUS: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left - right;
         }
         
         case TOK_MUL: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left * right;
         }
         
         case TOK_DIV: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left / right;
         }
         
         case TOK_MOD: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left % right;
         }
         
         case TOK_AND: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left && right;
         }
         
         case TOK_OR: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left || right;
         }
@@ -90,62 +67,43 @@ int eval(ast_t* ast) {
 
         case TOK_EQ: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left == right;
         }
         
         case TOK_NE: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left != right;
         }
         
         case TOK_LT: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left < right;
         }
         
         case TOK_LTE: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left <= right;
         }
         
         case TOK_GT: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left > right;
         }
         
         case TOK_GTE: {
             int left = eval(ast->left);
-            if (err_status != ERR_NONE) {
-                return 0;
-            }
             int right = eval(ast->right);
             return left >= right;
         }
 
         default: {
             wprintf(L"Error: Cannot evaluate token of type %ls\n", tok_type_to_str(ast->tok->type));
-            err_status = ERR_EVAL;
-            return 0;
+            smart_exit(ERR_EVAL);
         }
     }
 }

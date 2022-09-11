@@ -1,10 +1,8 @@
 #include "../include/lexer.h"
 
-extern ERROR_STATUS err_status;
-
 lexer_t* init_lexer() {
-    lexer_t* lexer = (lexer_t*) calloc(1, sizeof(lexer_t));
-    lexer->tokens = (token_t*) calloc(1, sizeof(token_t));
+    lexer_t* lexer = (lexer_t*) smart_alloc(1, sizeof(lexer_t));
+    lexer->tokens = (token_t*) smart_alloc(1, sizeof(token_t));
     lexer->size = 0;
     lexer->pos = 0;
     return lexer;
@@ -54,7 +52,11 @@ tok_type_t get_keyword_type(wchar_t* keyword) {
 
 int isop(wchar_t c) {
     switch (c) {
-        case L'=': case L'+': case L'-': case L'*': case L'/': case L'%': case L'<': case L'>': case L'!': return 1; default: return 0;
+        case L'=': case L'+': case L'-':
+        case L'*': case L'/': case L'%':
+        case L'<': case L'>': case L'!':
+            return 1;
+        default: return 0;
     }
 }
 
@@ -85,14 +87,17 @@ tok_type_t get_op_type(wchar_t* op) {
         return TOK_GTE;
     } else {
         wprintf(L"Error: Undefined operator `%ls`\n", op);
-        err_status = ERR_LEX;
-        return -1;
+        smart_exit(ERR_LEX);
     }
 }
 
 int issymbol(wchar_t c) {
     switch (c) {
-        case L'؛': case L'(': case L')': case L'{': case L'}': case L'[': case L']': case L':': case L'،': return 1; default: return 0;
+        case L'؛': case L'(': case L')':
+        case L'{': case L'}': case L'[':
+        case L']': case L':': case L'،':
+            return 1;
+        default: return 0;
     }
 }
 
@@ -109,8 +114,7 @@ tok_type_t get_symbol_type(wchar_t c) {
         case L'،': return TOK_COMMA;
         default: {
             wprintf(L"Error: Undefined symbol type for `%lc`\n", c);
-            err_status = ERR_LEX;
-            return -1;
+            smart_exit(ERR_LEX);
         }
     }
 }
@@ -133,10 +137,10 @@ void lex(src_t* src, lexer_t* lexer) {
         if (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_') {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->len = 0;
-            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
+            tok->data = (wchar_t*) smart_alloc(1, sizeof(wchar_t));
             do {
                 tok->data[tok->len++] = src->buf[src->pos++];
-                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
+                tok->data = (wchar_t*) smart_realloc(tok->data, tok->len + 1, sizeof(wchar_t));
             } while (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_' || isdigit(src->buf[src->pos]));
             tok->data[tok->len] = L'\0';
             tok->type = get_keyword_type(tok->data);
@@ -144,32 +148,31 @@ void lex(src_t* src, lexer_t* lexer) {
         } else if (isdigit(src->buf[src->pos])) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->len = 0;
-            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
+            tok->data = (wchar_t*) smart_alloc(1, sizeof(wchar_t));
             tok->type = TOK_INT;
             int period = 0;
             do {
                 if (src->buf[src->pos] == L'.') {
                     if (period) {
                         wprintf(L"Error: Invalid number format\n");
-                        err_status = ERR_LEX;
-                        return;
+                        smart_exit(ERR_LEX);
                     } else {
                         tok->type = TOK_FLOAT;
                         period = 1;
                     }
                 }
                 tok->data[tok->len++] = src->buf[src->pos++];
-                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
+                tok->data = (wchar_t*) smart_realloc(tok->data, tok->len + 1, sizeof(wchar_t));
             } while (isdigit(src->buf[src->pos]) || src->buf[src->pos] == L'.');
             tok->data[tok->len] = L'\0';
 
         } else if (isop(src->buf[src->pos])) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->len = 0;
-            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
+            tok->data = (wchar_t*) smart_alloc(1, sizeof(wchar_t));
             do {
                 tok->data[tok->len++] = src->buf[src->pos++];
-                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
+                tok->data = (wchar_t*) smart_realloc(tok->data, tok->len + 1, sizeof(wchar_t));
             } while (isop(src->buf[src->pos]));
             tok->data[tok->len] = L'\0';
             tok->type = get_op_type(tok->data);
@@ -178,7 +181,7 @@ void lex(src_t* src, lexer_t* lexer) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = get_symbol_type(src->buf[src->pos]);
             tok->len = 1;
-            tok->data = (wchar_t*) calloc(2, sizeof(wchar_t));
+            tok->data = (wchar_t*) smart_alloc(2, sizeof(wchar_t));
             tok->data[0] = src->buf[src->pos];
             tok->data[1] = L'\0';
             src->pos++;
@@ -187,17 +190,16 @@ void lex(src_t* src, lexer_t* lexer) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = TOK_CHAR;
             src->pos++;
-            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
+            tok->data = (wchar_t*) smart_alloc(1, sizeof(wchar_t));
             tok->len = 0;
             if (src->buf[src->pos] != L'’' && src->buf[src->pos] != L'\0') {
                 tok->data[tok->len++] = src->buf[src->pos++];
-                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
+                tok->data = (wchar_t*) smart_realloc(tok->data, tok->len + 1, sizeof(wchar_t));
             }
             tok->data[tok->len] = L'\0';
             if (src->buf[src->pos] != L'’') {
                 wprintf(L"Error: Invalid character format\n");
-                err_status = ERR_LEX;
-                return;
+                smart_exit(ERR_LEX);
             }
             src->pos++;
 
@@ -205,17 +207,16 @@ void lex(src_t* src, lexer_t* lexer) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->type = TOK_STR;
             src->pos++;
-            tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
+            tok->data = (wchar_t*) smart_alloc(1, sizeof(wchar_t));
             tok->len = 0;
             while (src->buf[src->pos] != L'"' && src->buf[src->pos] != L'\0') {
                 tok->data[tok->len++] = src->buf[src->pos++];
-                tok->data = (wchar_t*) realloc(tok->data, (tok->len + 1) * sizeof(wchar_t));
+                tok->data = (wchar_t*) smart_realloc(tok->data, tok->len + 1, sizeof(wchar_t));
             }
             tok->data[tok->len] = L'\0';
             if (src->buf[src->pos] != L'"') {
                 wprintf(L"Error: Missing closing double quote\n");
-                err_status = ERR_LEX;
-                return;
+                smart_exit(ERR_LEX);
             }
             src->pos++;
 
@@ -232,15 +233,14 @@ void lex(src_t* src, lexer_t* lexer) {
 
         } else {
             wprintf(L"Error: Undefined symbol `%lc` at %d:%d\n", src->buf[src->pos], line, src->pos + 1);
-            err_status = ERR_LEX;
-            return;
+            smart_exit(ERR_LEX);
         }
 
-        lexer->tokens = (token_t*) realloc(lexer->tokens, (lexer->size + 1) * sizeof(token_t));
+        lexer->tokens = (token_t*) smart_realloc(lexer->tokens, lexer->size + 1, sizeof(token_t));
     }
 
     token_t* tok = &lexer->tokens[lexer->size++];
-    tok->data = (wchar_t*) calloc(1, sizeof(wchar_t));
+    tok->data = (wchar_t*) smart_alloc(1, sizeof(wchar_t));
     tok->type = TOK_EOF;
 }
 
@@ -295,12 +295,4 @@ void print_tokens(lexer_t *lexer) {
         wprintf(L"`%ls`, len %d, type `%ls`\n", lexer->tokens[i].data, lexer->tokens[i].len, tok_type_to_str(lexer->tokens[i].type));
     }
     wprintf(L"----------------------------\n");
-}
-
-void free_lexer(lexer_t *lexer) {
-    for (int i = 0; i < lexer->size; i++) {
-        free(lexer->tokens[i].data);
-    }
-    free(lexer->tokens);
-    free(lexer);
 }

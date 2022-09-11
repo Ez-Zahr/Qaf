@@ -68,6 +68,5 @@ lexer_t* init_lexer();
 void lex(src_t* src, lexer_t* lexer);
 wchar_t* tok_type_to_str(tok_type_t type);
 void print_tokens(lexer_t* lexer);
-void free_lexer(lexer_t* lexer);
 
 #endif
