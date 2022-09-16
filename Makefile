@@ -4,15 +4,15 @@ LDFLAGS = -g
 SRC = ${wildcard src/*.c}
 HDR = ${wildcard include/*.h}
 OBJ = ${SRC:.c=.o}
-EXE = qaf
+EXEC = qaf
 
-all: ${SRC} ${OBJ} ${EXE}
+all: ${SRC} ${OBJ} ${EXEC}
 
-${EXE}: ${OBJ}
+${EXEC}: ${OBJ}
 	${CC} ${LDFLAGS} $^ -o $@
 
 %.o: %.c ${HDR}
 	${CC} ${CFLAGS} $< -o $@
 
 clean:
-	rm src/*.o ${EXE} a.*
+	rm src/*.o ${EXEC}.* a.*
