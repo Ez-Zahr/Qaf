@@ -9,42 +9,23 @@ int main(int argc, char* argv[]) {
         return ERR_MAIN;
     }
 
-    int _t = 0, _a = 0, _s = 0;
-    char* filename = 0;
-    for (int i = 1; i < argc; i++) {
-        if (argv[i][0] == '-') {
-            switch (argv[i][1]) {
-                case 't': _t = 1; break;
-                case 'a': _a = 1; break;
-                case 's': _s = 1; break;
-                default: wprintf(L"Error: Unknown option `%s`\n", argv[i]); return ERR_MAIN;
-            }
-        } else if (endsWith(argv[i], ".qaf") && !filename) {
-            filename = argv[i];
-        } else {
-            wprintf(L"Error: Unknown argument '%s'\n", argv[i]);
-            return ERR_MAIN;
-        }
-    }
-    if (!filename) {
-        wprintf(L"Please specify a .qaf input file (./qaf <filename>.qaf)\n");
-        return ERR_MAIN;
-    }
-
     init_allocs();
 
+    args_t* args = init_args();
+    read_args(argc, argv, args);
+
     src_t* src = init_src();
-    read_src(filename, src);
+    read_src(args->filename, src);
 
     lexer_t* lexer = init_lexer();
     lex(src, lexer);
-    if (_t) {
+    if (args->_t) {
         print_tokens(lexer);
     }
 
     ast_t* root = init_ast_list();
     parse(lexer, root);
-    if (_a) {
+    if (args->_a) {
         print_ast_list(root);
     }
 
@@ -52,10 +33,10 @@ int main(int argc, char* argv[]) {
     compile(root, sections);
     write_asm(sections, "a.s");
 
-    if (!_s) {
-        if (system("as a.s -o a.o") &&
-            system("ld a.o -o a.out") &&
-            system("rm a.s a.o")) {}
+    if (!args->_s) {
+        system("as a.s -o a.o");
+        system("ld a.o -o a.out");
+        system("rm a.s a.o");
     }
     
     free_allocs();

@@ -85,10 +85,10 @@ tok_type_t get_op_type(wchar_t* op) {
         return TOK_GT;
     } else if (!wcscmp(op, L">=")) {
         return TOK_GTE;
-    } else {
-        wprintf(L"Error: Undefined operator `%ls`\n", op);
-        smart_exit(ERR_LEX);
     }
+
+    wprintf(L"Error: Undefined operator `%ls`\n", op);
+    smart_exit(ERR_LEX);
 }
 
 int issymbol(wchar_t c) {
@@ -112,11 +112,10 @@ tok_type_t get_symbol_type(wchar_t c) {
         case L']': return TOK_RBRACK;
         case L':': return TOK_COLON;
         case L'،': return TOK_COMMA;
-        default: {
-            wprintf(L"Error: Undefined symbol type for `%lc`\n", c);
-            smart_exit(ERR_LEX);
-        }
     }
+    
+    wprintf(L"Error: Undefined symbol type for `%lc`\n", c);
+    smart_exit(ERR_LEX);
 }
 
 void skip_whitespace(src_t* src) {

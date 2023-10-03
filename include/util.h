@@ -11,6 +11,7 @@
 typedef enum ERROR_STATUS {
     ERR_NONE,
     ERR_MAIN,
+    ERR_ARGS,
     ERR_SRC,
     ERR_LEX,
     ERR_PARSE,
@@ -18,6 +19,11 @@ typedef enum ERROR_STATUS {
     ERR_ASM,
     ERR_EVAL
 } ERROR_STATUS;
+
+typedef struct args_t {
+    char* filename;
+    int _t, _a, _s;
+} args_t;
 
 typedef struct allocs_t {
     void** list;
@@ -41,6 +47,8 @@ typedef struct sections_t {
 } sections_t;
 
 wchar_t* wcsrev(wchar_t* str);
+args_t* init_args();
+void read_args(int argc, char* argv[], args_t* args);
 int endsWith(const char *str, const char *suffix);
 
 void init_allocs();

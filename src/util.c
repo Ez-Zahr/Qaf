@@ -14,6 +14,38 @@ wchar_t* wcsrev(wchar_t* str) {
     return str;
 }
 
+args_t* init_args() {
+    args_t* args = (args_t*) smart_alloc(1, sizeof(args_t));
+    args->filename = 0;
+    args->_t = 0;
+    args->_a = 0;
+    args->_s = 0;
+    return args;
+}
+
+void read_args(int argc, char* argv[], args_t* args) {
+    for (int i = 1; i < argc; i++) {
+        if (argv[i][0] == '-') {
+            switch (argv[i][1]) {
+                case 't': args->_t = 1; break;
+                case 'a': args->_a = 1; break;
+                case 's': args->_s = 1; break;
+                default: wprintf(L"Error: Unknown option `%s`\n", argv[i]); smart_exit(ERR_ARGS);
+            }
+        } else if (endsWith(argv[i], ".qaf") && !args->filename) {
+            args->filename = argv[i];
+        } else {
+            wprintf(L"Error: Unknown argument '%s'\n", argv[i]);
+            smart_exit(ERR_ARGS);
+        }
+    }
+
+    if (!args->filename) {
+        wprintf(L"Please specify a .qaf input file (./qaf <filename>.qaf)\n");
+        smart_exit(ERR_ARGS);
+    }
+}
+
 int endsWith(const char *str, const char *suffix) {
     if (!str || !suffix) {
         return 0;
