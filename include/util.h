@@ -7,10 +7,11 @@
 #include <string.h>
 #include <wchar.h>
 #include <locale.h>
+#include <windows.h>
 
 typedef enum ERROR_STATUS {
     ERR_NONE,
-    ERR_MAIN,
+    ERR_LOCALE,
     ERR_ARGS,
     ERR_SRC,
     ERR_LEX,
@@ -46,15 +47,16 @@ typedef struct sections_t {
     int labels;
 } sections_t;
 
-wchar_t* wcsrev(wchar_t* str);
+void set_locale();
+
 args_t* init_args();
 void read_args(int argc, char* argv[], args_t* args);
-int endsWith(const char *str, const char *suffix);
 
 void init_allocs();
 void* smart_alloc(int n, int size);
 void* smart_realloc(void* ptr, int n, int size);
 void free_allocs();
+
 void smart_exit(ERROR_STATUS status);
 
 src_t* init_src();

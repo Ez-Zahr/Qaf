@@ -106,4 +106,6 @@ int eval(ast_t* ast) {
             smart_exit(ERR_EVAL);
         }
     }
+
+    return 0;
 }

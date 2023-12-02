@@ -165,6 +165,8 @@ ast_t* parse_primary_expr(lexer_t* lexer) {
             smart_exit(ERR_PARSE);
         }
     }
+
+    return NULL;
 }
 
 ast_t* _parse(lexer_t* lexer, int prior) {
@@ -216,9 +218,9 @@ void _print_ast(ast_t* node, int indent) {
 }
 
 void print_ast_list(ast_t* ast) {
-    wprintf(L"----------<AST>----------\n");
+    wprintf(L">----------<AST>----------<\n");
     for (int i = 0; i < ast->size; i++) {
         _print_ast(ast->list[i], 0);
     }
-    wprintf(L"-------------------------\n");
+    wprintf(L">-------------------------<\n");
 }

@@ -85,10 +85,12 @@ tok_type_t get_op_type(wchar_t* op) {
         return TOK_GT;
     } else if (!wcscmp(op, L">=")) {
         return TOK_GTE;
+    } else {
+        wprintf(L"Error: Undefined operator `%ls`\n", op);
+        smart_exit(ERR_LEX);
     }
 
-    wprintf(L"Error: Undefined operator `%ls`\n", op);
-    smart_exit(ERR_LEX);
+    return 0;
 }
 
 int issymbol(wchar_t c) {
@@ -112,14 +114,17 @@ tok_type_t get_symbol_type(wchar_t c) {
         case L']': return TOK_RBRACK;
         case L':': return TOK_COLON;
         case L'،': return TOK_COMMA;
+        default: {
+            wprintf(L"Error: Undefined symbol type for `%lc`\n", c);
+            smart_exit(ERR_LEX);
+        }
     }
     
-    wprintf(L"Error: Undefined symbol type for `%lc`\n", c);
-    smart_exit(ERR_LEX);
+    return 0;
 }
 
 void skip_whitespace(src_t* src) {
-    while (isspace(src->buf[src->pos]) && src->buf[src->pos] != L'\n') {
+    while (iswspace(src->buf[src->pos]) && src->buf[src->pos] != L'\n') {
         src->pos++;
     }
 }
@@ -128,7 +133,7 @@ void lex(src_t* src, lexer_t* lexer) {
     int line = 1;
     while (1) {
         skip_whitespace(src);
-
+        
         if (src->buf[src->pos] == L'\0') {
             break;
         }
@@ -140,11 +145,11 @@ void lex(src_t* src, lexer_t* lexer) {
             do {
                 tok->data[tok->len++] = src->buf[src->pos++];
                 tok->data = (wchar_t*) smart_realloc(tok->data, tok->len + 1, sizeof(wchar_t));
-            } while (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_' || isdigit(src->buf[src->pos]));
+            } while (isaralpha(src->buf[src->pos]) || src->buf[src->pos] == L'_' || iswdigit(src->buf[src->pos]));
             tok->data[tok->len] = L'\0';
             tok->type = get_keyword_type(tok->data);
 
-        } else if (isdigit(src->buf[src->pos])) {
+        } else if (iswdigit(src->buf[src->pos])) {
             token_t* tok = &lexer->tokens[lexer->size++];
             tok->len = 0;
             tok->data = (wchar_t*) smart_alloc(1, sizeof(wchar_t));
@@ -162,7 +167,7 @@ void lex(src_t* src, lexer_t* lexer) {
                 }
                 tok->data[tok->len++] = src->buf[src->pos++];
                 tok->data = (wchar_t*) smart_realloc(tok->data, tok->len + 1, sizeof(wchar_t));
-            } while (isdigit(src->buf[src->pos]) || src->buf[src->pos] == L'.');
+            } while (iswdigit(src->buf[src->pos]) || src->buf[src->pos] == L'.');
             tok->data[tok->len] = L'\0';
 
         } else if (isop(src->buf[src->pos])) {
@@ -289,9 +294,9 @@ wchar_t* tok_type_to_str(tok_type_t type) {
 }
 
 void print_tokens(lexer_t *lexer) {
-    wprintf(L"----------<Tokens>----------\n");
+    wprintf(L">----------<Tokens>----------<\n");
     for (int i = 0; i < lexer->size; i++) {
         wprintf(L"`%ls`, len %d, type `%ls`\n", lexer->tokens[i].data, lexer->tokens[i].len, tok_type_to_str(lexer->tokens[i].type));
     }
-    wprintf(L"----------------------------\n");
+    wprintf(L">----------------------------<\n");
 }

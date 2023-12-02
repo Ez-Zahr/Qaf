@@ -4,12 +4,9 @@
 #include "../include/compiler.h"
 
 int main(int argc, char* argv[]) {
-    if (setlocale(LC_ALL, "ar_SA.utf8") == NULL) {
-        wprintf(L"Failed to set locale\n");
-        return ERR_MAIN;
-    }
-
     init_allocs();
+
+    set_locale();
 
     args_t* args = init_args();
     read_args(argc, argv, args);
@@ -35,7 +32,7 @@ int main(int argc, char* argv[]) {
 
     if (!args->_s) {
         system("as a.s -o a.o");
-        system("ld a.o -o a.out");
+        system("ld a.o -o a.exe");
         system("rm a.s a.o");
     }
     

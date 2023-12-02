@@ -301,6 +301,8 @@ wchar_t* _compile_ast(ast_t* ast, scope_t* scope, sections_t* sections) {
             smart_exit(ERR_COMPILE);
         }
     }
+
+    return NULL;
 }
 
 wchar_t* _compile_binary_instr(ast_t* ast, scope_t* scope, sections_t* sections, wchar_t* op) {

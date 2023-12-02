@@ -1,17 +1,28 @@
 #include "../include/util.h"
 
+#if defined(_WIN32) || defined(_WIN64)
+    const char* OS = "Windows";
+#elif defined(__linux)
+    const char* OS = "Linux";
+#else
+    const char* OS = "Unknown";
+#endif
+
 static allocs_t* allocs = 0;
 
-wchar_t* wcsrev(wchar_t* str) {
-    wchar_t *p1, *p2;
-    if (!str || !*str)
-        return str;
-    for (p1 = str, p2 = str + wcslen(str) - 1; p2 > p1; ++p1, --p2){
-        *p1 ^= *p2;
-        *p2 ^= *p1;
-        *p1 ^= *p2;
+void set_locale() {
+    char* locale = NULL;
+
+    if (!strcmp(OS, "Windows")) {
+        locale = setlocale(LC_ALL, "Arabic_Saudi Arabia.1256");
+    } else if (!strcmp(OS, "Linux")) {
+        locale = setlocale(LC_ALL, "ar_SA.utf8");
     }
-    return str;
+
+    if (locale == NULL) {
+        wprintf(L"Failed to set locale\n");
+        smart_exit(ERR_LOCALE);
+    }
 }
 
 args_t* init_args() {
@@ -21,6 +32,20 @@ args_t* init_args() {
     args->_a = 0;
     args->_s = 0;
     return args;
+}
+
+int endsWith(const char *str, const char *suffix) {
+    if (!str || !suffix) {
+        return 0;
+    }
+
+    size_t strLen = strlen(str);
+    size_t sufLen = strlen(suffix);
+    if (sufLen >= strLen) {
+        return 0;
+    }
+
+    return strncmp(str + strLen - sufLen, suffix, sufLen) == 0;
 }
 
 void read_args(int argc, char* argv[], args_t* args) {
@@ -45,21 +70,6 @@ void read_args(int argc, char* argv[], args_t* args) {
         smart_exit(ERR_ARGS);
     }
 }
-
-int endsWith(const char *str, const char *suffix) {
-    if (!str || !suffix) {
-        return 0;
-    }
-
-    size_t strLen = strlen(str);
-    size_t sufLen = strlen(suffix);
-    if (sufLen >= strLen) {
-        return 0;
-    }
-
-    return strncmp(str + strLen - sufLen, suffix, sufLen) == 0;
-}
-
 
 void init_allocs() {
     if (allocs) return;
@@ -99,7 +109,7 @@ void smart_exit(ERROR_STATUS status) {
 
 src_t* init_src() {
     src_t* src = (src_t*) smart_alloc(1, sizeof(src_t));
-    src->buf = (wchar_t*) smart_alloc(1, sizeof(wchar_t));
+    src->buf = NULL;
     src->size = 0;
     src->pos = 0;
     return src;
@@ -107,20 +117,29 @@ src_t* init_src() {
 
 void read_src(char* filename, src_t* src) {
     FILE* input;
-
+    
     if ((input = fopen(filename, "r")) == NULL) {
         wprintf(L"Could not open file %s\n", filename);
         smart_exit(ERR_SRC);
     }
 
-    wint_t c;
-    while ((c = fgetwc(input)) != WEOF) {
-        src->buf[src->size++] = c;
-        src->buf = (wchar_t*) smart_realloc(src->buf, src->size + 1, sizeof(wchar_t));
-    }
-    src->buf[src->size] = L'\0';
-    
+    fseek(input, 0L, SEEK_END);
+    long sz = ftell(input);
+    rewind(input);
+    char bf[sz];
+    fread(bf, sizeof(char), sz, input);
     fclose(input);
+
+    for (int i = sz - 1; i >= 0; i--) {
+        if ((bf[i] == 0xffffff9b || bf[i] == 0x7d) && (i + 1) < sz) {
+            bf[i + 1] = '\0';
+            break;
+        }
+    }
+
+    src->size = MultiByteToWideChar(CP_UTF8, 0, bf, -1, NULL, 0);
+    src->buf = (wchar_t*) smart_alloc(src->size + 1, sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, bf, -1, src->buf, src->size);
 }
 
 sections_t* init_sections() {

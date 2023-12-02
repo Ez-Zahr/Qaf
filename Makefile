@@ -7,6 +7,7 @@ OBJ = ${SRC:.c=.o}
 EXEC = qaf
 
 all: ${SRC} ${OBJ} ${EXEC}
+	rm src/*.o
 
 ${EXEC}: ${OBJ}
 	${CC} ${LDFLAGS} $^ -o $@
@@ -15,4 +16,4 @@ ${EXEC}: ${OBJ}
 	${CC} ${CFLAGS} $< -o $@
 
 clean:
-	rm src/*.o a.*
+	rm ${EXEC}.* a.*
